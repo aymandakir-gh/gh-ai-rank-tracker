@@ -3,12 +3,15 @@ import { readFileSync } from "node:fs";
 import { runTracking } from "./tracker";
 import { renderConsole, renderMarkdown } from "./report";
 import { MockProvider, type AnswerEngineProvider } from "./providers";
+import { PerplexityProvider } from "./providers/perplexity";
 import { demoConfig, demoProviders } from "./demo";
 import type { TrackingConfig } from "./types";
 
 interface CliArgs {
   demo: boolean;
   config?: string;
+  provider: string;
+  url?: string;
   json: boolean;
   markdown: boolean;
   help: boolean;
@@ -17,24 +20,32 @@ interface CliArgs {
 const HELP = `gh-ai-rank-tracker — GEO/AEO AI visibility tracker
 
 Usage:
-  gh-ai-rank-tracker --demo                 Run the built-in demo (no setup)
-  gh-ai-rank-tracker --config <file.json>   Run with your own TrackingConfig
-  gh-ai-rank-tracker --demo --markdown      Output a Markdown report
-  gh-ai-rank-tracker --demo --json          Output the raw report as JSON
+  gh-ai-rank-tracker --demo                               Run the built-in demo (no setup)
+  gh-ai-rank-tracker --config <file.json>                 Run with your own TrackingConfig
+  gh-ai-rank-tracker --provider perplexity --url <url>    Live analysis with Perplexity
+  gh-ai-rank-tracker --demo --markdown                    Markdown report output
+  gh-ai-rank-tracker --demo --json                        JSON report output
 
 Flags:
-  --demo            Use the bundled demo config + scripted engines
-  --config, -c      Path to a JSON TrackingConfig
-  --markdown, --md  Render a Markdown report
-  --json            Render the raw report object as JSON
-  --help, -h        Show this help
+  --demo                  Use the bundled demo config with scripted engines
+  --config, -c            Path to a JSON TrackingConfig file
+  --provider, -p          Engine provider: "mock" (default) | "perplexity"
+  --url, -u               Brand URL for quick analysis (uses demo prompts)
+  --markdown, --md        Render a Markdown report
+  --json                  Render the raw report object as JSON
+  --help, -h              Show this help
 
-Note: v0.1 ships the deterministic MockProvider. Live engine adapters
-(Perplexity, OpenAI, Gemini, Google AI Overviews) implement the same
-AnswerEngineProvider interface and are the next milestone.`;
+Environment variables:
+  PERPLEXITY_API_KEY      Required when --provider perplexity is set`;
 
 function parseArgs(argv: string[]): CliArgs {
-  const a: CliArgs = { demo: false, json: false, markdown: false, help: false };
+  const a: CliArgs = {
+    demo: false,
+    json: false,
+    markdown: false,
+    help: false,
+    provider: "mock",
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--demo") a.demo = true;
@@ -42,32 +53,75 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--markdown" || arg === "--md") a.markdown = true;
     else if (arg === "--help" || arg === "-h") a.help = true;
     else if (arg === "--config" || arg === "-c") a.config = argv[++i];
+    else if (arg === "--provider" || arg === "-p") a.provider = argv[++i] ?? "mock";
+    else if (arg === "--url" || arg === "-u") a.url = argv[++i];
   }
   return a;
 }
 
+/** Derive a quick TrackingConfig from a brand URL using the demo prompt set. */
+function buildConfigFromUrl(rawUrl: string): TrackingConfig {
+  const parsed = new URL(rawUrl); // throws TypeError on invalid URL
+  const hostname = parsed.hostname.replace(/^www\./, "");
+  const [firstPart] = hostname.split(".");
+  const brandName =
+    firstPart ? firstPart.charAt(0).toUpperCase() + firstPart.slice(1) : hostname;
+  return {
+    brand: { name: brandName, domain: hostname, aliases: [hostname] },
+    prompts: demoConfig.prompts,
+  };
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+
   if (args.help) {
     console.log(HELP);
     return;
   }
 
+  // ── Config ─────────────────────────────────────────────────────────────────
   let config: TrackingConfig;
-  let providers: AnswerEngineProvider[];
-
   if (args.config) {
     config = JSON.parse(readFileSync(args.config, "utf8")) as TrackingConfig;
-    providers = [new MockProvider({ engine: "mock" })];
-    console.error(
-      "[gh-ai-rank-tracker] Loaded config; using MockProvider (no live adapters in v0.1). Wire a real provider to query live engines.",
-    );
+  } else if (args.url) {
+    try {
+      config = buildConfigFromUrl(args.url);
+    } catch {
+      console.error(`[gh-ai-rank-tracker] Invalid --url: "${args.url}"`);
+      process.exitCode = 1;
+      return;
+    }
   } else {
     config = demoConfig;
-    providers = demoProviders();
     if (!args.demo) {
-      console.error("[gh-ai-rank-tracker] No --config given; running the built-in --demo.");
+      console.error(
+        "[gh-ai-rank-tracker] No --config or --url given; running the built-in --demo.",
+      );
     }
+  }
+
+  // ── Providers ───────────────────────────────────────────────────────────────
+  let providers: AnswerEngineProvider[];
+  if (args.provider === "perplexity") {
+    try {
+      providers = [new PerplexityProvider()];
+    } catch (err) {
+      console.error(
+        `[gh-ai-rank-tracker] ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  } else if (args.config || args.url) {
+    // Custom config / URL mode with the default mock provider
+    providers = [new MockProvider({ engine: "mock" })];
+    console.error(
+      "[gh-ai-rank-tracker] Using MockProvider. Pass --provider perplexity for live queries.",
+    );
+  } else {
+    // Demo mode — use the scripted demo providers
+    providers = demoProviders();
   }
 
   const report = await runTracking(config, providers);
