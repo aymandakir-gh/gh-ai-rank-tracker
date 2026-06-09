@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import type { Locale } from '@/lib/i18n'
 import { translations, LOCALE_LABELS, RTL_LOCALES } from '@/lib/i18n'
+import { LanguageProvider } from '@/components/LanguageProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,9 @@ export default function HomePage() {
 
   return (
     <div dir={dir} className="min-h-screen bg-[#0a0e1a] text-slate-100">
+      {/* Syncs <html lang> and <html dir> with the active locale client-side */}
+      <LanguageProvider locale={locale} />
+
       {/* Ambient gradient */}
       <div
         className="fixed inset-0 z-0 pointer-events-none"
