@@ -1,0 +1,20 @@
+# Railway deployment configuration for gh-ai-rank-tracker
+# Docs: https://docs.railway.app/reference/config-as-code
+#
+# Required environment variables (set in Railway dashboard — never commit these):
+#   SCAN_API_KEY        Bearer token for API auth (openssl rand -hex 32)
+#   PERPLEXITY_API_KEY  Perplexity API key (required for provider=perplexity)
+#
+# Auto-injected by Railway:
+#   PORT                Railway sets this automatically
+
+[build]
+  builder = "NIXPACKS"
+  buildCommand = "npm run build"
+
+[deploy]
+  startCommand = "npm start"
+  healthcheckPath = "/health"
+  healthcheckTimeout = 30
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 3
