@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import type { Locale } from '@/lib/i18n'
 import { translations, LOCALE_LABELS, RTL_LOCALES } from '@/lib/i18n'
 import { LanguageProvider } from '@/components/LanguageProvider'
+import { EmailGate, type EmailGateVariant } from '@/components/EmailGate'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,15 @@ function validateUrl(val: string): boolean {
   }
 }
 
+/** Extract bare domain from a URL string, e.g. "https://acme.com/path" → "acme.com" */
+function extractDomain(urlStr: string): string {
+  try {
+    return new URL(urlStr).hostname.replace(/^www\./, '')
+  } catch {
+    return urlStr
+  }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -76,6 +86,11 @@ export default function HomePage() {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [urlError, setUrlError] = useState('')
+
+  // Email gate state
+  const [emailGateOpen, setEmailGateOpen] = useState(false)
+  const [gateVariant] = useState<EmailGateVariant>('a') // A/B/C — default A, randomise server-side if needed
+  const [leadCaptured, setLeadCaptured] = useState(false)
 
   const t = useCallback(
     (key: string): string =>
@@ -107,6 +122,7 @@ export default function HomePage() {
     setPhase('scanning')
     setResult(null)
     setErrorMsg('')
+    setLeadCaptured(false)
 
     try {
       const res = await fetch('/api/scan', {
@@ -127,6 +143,10 @@ export default function HomePage() {
 
       setResult(data.result)
       setPhase('results')
+      // Show email gate after results render (only once per scan, skip if already captured)
+      if (!leadCaptured) {
+        setEmailGateOpen(true)
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Scan failed')
       setPhase('error')
@@ -138,6 +158,7 @@ export default function HomePage() {
     setResult(null)
     setErrorMsg('')
     setUrlError('')
+    setEmailGateOpen(false)
   }
 
   return (
@@ -308,6 +329,21 @@ export default function HomePage() {
           </a>
         </footer>
       </div>
+
+      {/* Email Gate Modal — rendered after results, portal-like at root */}
+      {emailGateOpen && result && (
+        <EmailGate
+          domain={extractDomain(url)}
+          score={result.visibilityScore}
+          variant={gateVariant}
+          onClose={() => setEmailGateOpen(false)}
+          onSuccess={(capturedEmail) => {
+            setLeadCaptured(true)
+            setEmailGateOpen(false)
+            console.info('[gate] lead captured:', capturedEmail)
+          }}
+        />
+      )}
     </div>
   )
 }
