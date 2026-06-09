@@ -12,3 +12,5 @@ export * from "./providers";
 export * from "./tracker";
 export * from "./report";
 export { demoConfig, demoProviders } from "./demo";
+export { PerplexityProvider, PerplexityApiError } from "./providers/perplexity";
+export type { PerplexityOptions } from "./providers/perplexity";
