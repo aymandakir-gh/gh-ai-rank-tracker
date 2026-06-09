@@ -5,6 +5,8 @@
  * pass through the requested AI-engine providers, and returns a TrackingReport
  * as JSON.
  *
+ * GET /health returns { ok: true, version, ts } — used by Railway healthcheck.
+ *
  * Security:
  *   - Bearer-token auth via SCAN_API_KEY env var (skipped in dev if not set).
  *   - Constant-time token comparison via crypto.timingSafeEqual (OWASP A02).
@@ -19,6 +21,8 @@ import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
 import type { TrackingReport, TrackingConfig } from "../types";
 import { demoConfig } from "../demo";
+
+const VERSION = "0.3.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -149,6 +153,12 @@ export function createApp(opts: AppOptions = {}) {
   const apiKey = opts.scanApiKey ?? process.env["SCAN_API_KEY"] ?? "";
   const limiter: RateLimiter = opts.rateLimiter ?? new InMemoryRateLimiter();
   const app = new Hono();
+
+  // ── Health check ────────────────────────────────────────────────────────────
+  // No auth required — used by Railway healthcheckPath and load balancers.
+  app.get("/health", (c) => {
+    return c.json({ ok: true, version: VERSION, ts: Date.now() });
+  });
 
   app.post("/api/scan", async (c) => {
     // ── 1. Auth ───────────────────────────────────────────────────────────────
