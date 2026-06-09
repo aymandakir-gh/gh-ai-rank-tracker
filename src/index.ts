@@ -14,3 +14,7 @@ export * from "./report";
 export { demoConfig, demoProviders } from "./demo";
 export { PerplexityProvider, PerplexityApiError } from "./providers/perplexity";
 export type { PerplexityOptions } from "./providers/perplexity";
+
+// ─── API layer ────────────────────────────────────────────────────────────────
+export { createApp, buildConfigFromUrl, buildProviders, InMemoryRateLimiter } from "./api/scan";
+export type { ScanRequest, ScanResponse, AppOptions, RateLimiter } from "./api/scan";
