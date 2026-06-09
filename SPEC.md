@@ -3,7 +3,8 @@
 **Status:** `#da-validare` — pending W2·Build assignment  
 **Milestone:** M3 of 4  
 **Owner:** W5·Frontend (spec) → W2·Build (implementation)  
-**Date:** 2026-06-09
+**Date:** 2026-06-09  
+**Updated:** 2026-06-09 (W5 run 8 — email gate flow expanded + explicit M3 scope)
 
 ---
 
@@ -19,7 +20,7 @@ Ship a Next.js App Router web UI for `gh-ai-rank-tracker` that lets users config
 |---|---|---|
 | M1 | Core engine + CLI + 33 tests | ✅ Shipped 2026-06-08 |
 | M2 | Live provider adapters (Perplexity, OpenAI, Gemini) | 🔄 Queued |
-| **M3** | **Next.js web dashboard (this spec)** | ⏳ Planned |
+| **M3** | **Next.js web dashboard + email gate lead capture (this spec)** | ⏳ Planned |
 | M4 | Scheduled runs + historical trend tracking | ⏳ Backlog |
 
 > M3 can be built on top of the MockProvider (no live API keys required). M2 adapters plug in transparently once shipped.
@@ -48,8 +49,93 @@ ResultsView
   ├─ Stage breakdown (mention / citation / prominence)
   ├─ Prompt-level table
   ├─ Citation breakdown (which sources cited, at what rank)
-  └─ [Share] → email gate → unique shareable URL
+  └─ [Share] → email gate modal → POST /api/lead → unique shareable URL
 ```
+
+---
+
+## Email Gate Flow (M3 scope — explicit)
+
+This is a **first-class M3 deliverable**, not an optional enhancement. It is the NSM driver: every share = one lead captured.
+
+### State Machine
+
+```
+idle
+  → [Share button click] → modal_open
+      → [user types email] → validating (client-side)
+          → [invalid email] → validation_error (stay in modal)
+          → [valid email] → submitting
+              → [POST /api/lead 2xx] → success
+                  → generate ?r= URL → copy to clipboard → show confirmation
+              → [POST /api/lead 4xx/5xx] → submit_error
+                  → show retry message; keep modal open; user can retry
+              → [POST /api/lead timeout >8s] → submit_error (same)
+  → [Escape / outside click] → idle (modal closed; results still visible)
+  → [LEADS_API_URL not configured] → fallback: log to console + open share URL anyway (never block results)
+```
+
+### API Contract
+
+```ts
+// POST LEADS_API_URL/api/lead
+interface LeadPayload {
+  email: string;          // required, valid format
+  source: "ai-rank-tracker";
+  firstName?: string;     // optional — shown in email modal as "Name (optional)"
+}
+
+// 200/201 → success; generate shareable URL
+// 409 → duplicate (already submitted) — treat as success, don't show error
+// 4xx/5xx → show retry; never block results
+```
+
+### Shareable URL Generation
+
+```ts
+// On successful lead capture:
+const token = btoa(JSON.stringify(result));   // base64 encode full WebScanResult
+const shareUrl = `${window.location.origin}/results?r=${token}`;
+// → copy to clipboard via navigator.clipboard.writeText(shareUrl)
+// → fallback: show URL in text field if clipboard API unavailable
+```
+
+### Email Gate UI Spec
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Share your AI Visibility Score                      │
+│                                                      │
+│  Enter your email to get a shareable link + report   │
+│                                                      │
+│  Name (optional)  [___________________________]      │
+│  Email *          [___________________________]      │
+│                   ← inline validation: "valid email" │
+│                                                      │
+│  [Cancel]                    [Get my shareable link] │
+│                                                      │
+│  🔒 We'll send you the report. Unsubscribe anytime.  │
+└──────────────────────────────────────────────────────┘
+```
+
+- Modal: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing to title
+- Focus trap: Tab cycles within modal only; Escape closes
+- Submit button: `aria-busy="true"` + spinner while submitting; disabled during in-flight request
+- Error state: `role="alert"` message under email field
+- Success state: replace modal body with "Link copied! ✓ Share URL: [truncated]"
+
+### Acceptance Criteria (email gate only)
+
+- [ ] Share button is present on ResultsView and keyboard-reachable (Tab + Enter)
+- [ ] Modal opens on click; focus moves to first input; Escape closes
+- [ ] Client-side validation: empty email + invalid format both show inline error
+- [ ] Valid email triggers POST to `LEADS_API_URL/api/lead` with `source: "ai-rank-tracker"`
+- [ ] 2xx response: generate `?r=` URL, copy to clipboard, show confirmation in modal
+- [ ] 409 (duplicate): treat as success — generate and copy URL, no error shown
+- [ ] Network error / timeout: show retry message; modal stays open; results never hidden
+- [ ] Missing `LEADS_API_URL` env var: skip POST, log to console, generate URL anyway
+- [ ] `firstName` field present but optional — no validation error if blank
+- [ ] WCAG 2.1 AA: contrast ≥4.5:1; screen reader announces success/error via `role="alert"`
 
 ---
 
@@ -144,21 +230,15 @@ interface WebScanResult {
 5. **Citation Breakdown** — per prompt: which URLs were cited and at what rank; sorted by rank asc; domain only shown (no full URL)
 6. **Top Gaps** — list of prompts where brand has 0 mentions; CTA "Fix these with GEO"
 7. **Recommendations** — card list sorted by priority (high → low); icon per priority level
-8. **Share CTA** — button "Share my score"; opens email gate modal; on submit → encode result as base64 URL token → copy link to clipboard + show preview
+8. **Share CTA** — button "Share my score"; opens email gate modal (see Email Gate Flow above)
 
-#### Email Gate (Share modal)
+#### Email Gate (Share modal) — see dedicated section above
 
-```ts
-interface LeadPayload {
-  email: string;       // required, valid email
-  source: "ai-rank-tracker";
-}
-```
-
-- POST to `LEADS_API_URL/api/lead` (same endpoint as gh-growth-score)
-- On success: generate shareable URL `?r=<base64-encoded-result>` → copy to clipboard
-- Error state: show retry; never block viewing results
-- Privacy note: "We'll send you the report. Unsubscribe anytime."
+Quick reference:
+- POST to `LEADS_API_URL/api/lead` with `source: "ai-rank-tracker"`
+- On 2xx: generate `?r=<base64-encoded-result>` → copy to clipboard
+- On error: show retry; never block viewing results
+- On missing env: fallback to console log + generate URL anyway
 
 ---
 
@@ -215,6 +295,7 @@ interface ScanResponse {
 - Scan loading state: `aria-busy="true"` on the results section; spinner has `role="status"` + sr-only text
 - All charts: `<table>` fallback with `sr-only` class for screen readers
 - WCAG 2.1 AA minimum contrast for all text
+- Email gate modal: `role="dialog"`, focus trap, `role="alert"` for errors/success
 
 ---
 
@@ -253,17 +334,21 @@ GOOGLE_AI_API_KEY=                     # optional
 
 ---
 
-## Acceptance Criteria
+## Acceptance Criteria (full M3)
 
 - [ ] User can fill the config form and trigger a scan
 - [ ] Results page shows AI Visibility Score + 4 breakdown bars
 - [ ] Citation breakdown table shows domain + rank per prompt
-- [ ] Share button opens email gate → generates `?r=` URL → copies to clipboard
-- [ ] Email gate POSTs to `LEADS_API_URL` (or logs to console if env not set)
+- [ ] **Share button opens email gate modal** (see Email Gate Flow section)
+- [ ] **Valid email → POST to `LEADS_API_URL` → generate `?r=` URL → copy to clipboard**
+- [ ] **409 duplicate → treated as success; no error shown**
+- [ ] **Network error → retry message; results never blocked**
+- [ ] **Missing `LEADS_API_URL` → fallback: skip POST, generate URL anyway**
 - [ ] `npm run build` passes with zero TypeScript errors
 - [ ] All interactive elements keyboard-reachable; contrast ≥4.5:1
 - [ ] Mobile layout functional at 375px viewport
 - [ ] Loading state shown during scan (no blank screen)
+- [ ] Email gate modal: focus trap, Escape closes, `role="dialog"` + `aria-modal`
 
 ---
 
