@@ -1,6 +1,6 @@
 {
   "name": "gh-ai-rank-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Track whether AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini) mention and cite your brand. A GEO/AEO visibility & share-of-voice tracker.",
   "type": "module",
   "license": "MIT",
@@ -37,7 +37,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "tsx src/cli.ts --demo",
-    "cli": "tsx src/cli.ts"
+    "cli": "tsx src/cli.ts",
+    "analyze": "tsx src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
