@@ -3,7 +3,8 @@
  *
  * POST /api/scan accepts a brand URL + provider list, runs a full tracking
  * pass through the requested AI-engine providers, and returns a TrackingReport
- * as JSON.
+ * as JSON. Input is screened by the Aegis guard (prompt injection + jailbreak)
+ * before any business logic executes.
  *
  * GET /health returns { ok: true, version, ts } — used by Railway healthcheck.
  *
@@ -12,6 +13,7 @@
  *   - Constant-time token comparison via crypto.timingSafeEqual (OWASP A02).
  *   - In-memory sliding-window rate limit: 10 requests / IP / minute.
  *   - Input validated before any provider instantiation.
+ *   - Aegis input guard: prompt-injection + jailbreak detection (set AEGIS_ENABLED=true to activate).
  */
 
 import { timingSafeEqual } from "crypto";
@@ -21,6 +23,7 @@ import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
 import type { TrackingReport, TrackingConfig } from "../types";
 import { demoConfig } from "../demo";
+import { createAegisGuard, type AegisGuard } from "../aegis";
 
 const VERSION = "0.3.0";
 
@@ -84,6 +87,12 @@ export interface AppOptions {
   scanApiKey?: string;
   /** Injectable rate limiter — defaults to InMemoryRateLimiter(60_000, 10). */
   rateLimiter?: RateLimiter;
+  /**
+   * Injectable Aegis guard for input validation.
+   * Defaults to createAegisGuard() which reads AEGIS_ENABLED env var.
+   * In production set AEGIS_ENABLED=true; in tests inject a configured guard directly.
+   */
+  aegisGuard?: AegisGuard;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,6 +161,7 @@ export function buildProviders(names: string[]): AnswerEngineProvider[] {
 export function createApp(opts: AppOptions = {}) {
   const apiKey = opts.scanApiKey ?? process.env["SCAN_API_KEY"] ?? "";
   const limiter: RateLimiter = opts.rateLimiter ?? new InMemoryRateLimiter();
+  const aegis: AegisGuard = opts.aegisGuard ?? createAegisGuard();
   const app = new Hono();
 
   // ── Health check ────────────────────────────────────────────────────────────
@@ -210,6 +220,22 @@ export function createApp(opts: AppOptions = {}) {
       Array.isArray(providersField) && providersField.length > 0
         ? (providersField as string[])
         : ["mock"];
+
+    // ── 3b. Aegis input guard ─────────────────────────────────────────────────
+    // Scans the raw URL string for prompt injection and jailbreak patterns
+    // before any business logic executes. Controlled by AEGIS_ENABLED env var
+    // (or inject an enabled guard via AppOptions.aegisGuard for tests).
+    // Error details are never forwarded to the caller (OWASP A03 info exposure).
+    const aegisResult = await aegis.scan(urlField, { scope: "input" });
+    if (!aegisResult.safe) {
+      return c.json(
+        {
+          ok: false,
+          error: `Input blocked: ${aegisResult.threatType ?? "UNKNOWN_THREAT"}`,
+        } satisfies ScanResponse,
+        400,
+      );
+    }
 
     // ── 4. Build TrackingConfig ───────────────────────────────────────────────
     let config: TrackingConfig;
