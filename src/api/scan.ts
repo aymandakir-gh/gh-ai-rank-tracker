@@ -7,10 +7,12 @@
  *
  * Security:
  *   - Bearer-token auth via SCAN_API_KEY env var (skipped in dev if not set).
+ *   - Constant-time token comparison via crypto.timingSafeEqual (OWASP A02).
  *   - In-memory sliding-window rate limit: 10 requests / IP / minute.
  *   - Input validated before any provider instantiation.
  */
 
+import { timingSafeEqual } from "crypto";
 import { Hono } from "hono";
 import { runTracking } from "../tracker";
 import { MockProvider, type AnswerEngineProvider } from "../providers";
@@ -83,6 +85,21 @@ export interface AppOptions {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * Constant-time string comparison using Node's crypto.timingSafeEqual.
+ * Prevents timing-oracle attacks that leak token content via response latency.
+ *
+ * Returns false immediately when byte-lengths differ (length is not secret —
+ * it's implicit in the protocol). Content comparison is always constant-time
+ * regardless of where the first differing byte is.
+ */
+function safeCompare(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.byteLength !== bBuf.byteLength) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
+/**
  * Derive a TrackingConfig from a brand URL.
  * Uses the standard demo prompt set; brand name + domain inferred from URL.
  * Throws TypeError on an invalid URL string.
@@ -138,7 +155,7 @@ export function createApp(opts: AppOptions = {}) {
     if (apiKey) {
       const authHeader = c.req.header("Authorization") ?? "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-      if (token !== apiKey) {
+      if (!safeCompare(token, apiKey)) {
         return c.json({ ok: false, error: "Unauthorized" } satisfies ScanResponse, 401);
       }
     }
