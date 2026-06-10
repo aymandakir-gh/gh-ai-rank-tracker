@@ -3,6 +3,7 @@ import {
   createApp,
   buildConfigFromUrl,
   buildProviders,
+  sanitizeBrandName,
   type RateLimiter,
   type ScanResponse,
 } from "../src/api/scan";
@@ -36,6 +37,39 @@ function scanRequest(body: unknown, headers: Record<string, string> = {}): Reque
   });
 }
 
+// ─── sanitizeBrandName ────────────────────────────────────────────────────────
+
+describe("sanitizeBrandName", () => {
+  it("clean — passes alphanum + hyphen names through unchanged", () => {
+    expect(sanitizeBrandName("Acme")).toBe("Acme");
+    expect(sanitizeBrandName("My-Brand")).toBe("My-Brand");
+    expect(sanitizeBrandName("Brand123")).toBe("Brand123");
+  });
+
+  it("injected — strips non-alphanum/hyphen chars (script tags, underscores, angle brackets)", () => {
+    // Simulates a raw brand name that somehow contains injection chars
+    // (defense-in-depth: sanitize regardless of upstream validation)
+    expect(sanitizeBrandName("<script>xss")).toBe("scriptxss");
+    expect(sanitizeBrandName("evil_brand")).toBe("evilbrand");
+    expect(sanitizeBrandName("my brand")).toBe("mybrand");        // space stripped
+    expect(sanitizeBrandName("hello.world")).toBe("helloworld");  // dot stripped
+  });
+
+  it("truncated — caps at 50 chars regardless of input length", () => {
+    const hundred = "A".repeat(100);
+    const result = sanitizeBrandName(hundred);
+    expect(result.length).toBe(50);
+    expect(result).toBe("A".repeat(50));
+
+    // Long hyphenated name with 60 chars — truncated to 50
+    const longHyphen = "a-very-very-long-brand-name-that-exceeds-fifty-chars";
+    const truncated = sanitizeBrandName(longHyphen);
+    expect(truncated.length).toBeLessThanOrEqual(50);
+    // All retained chars must still be safe
+    expect(truncated).toMatch(/^[a-zA-Z0-9-]*$/);
+  });
+});
+
 // ─── buildConfigFromUrl ────────────────────────────────────────────────────────
 
 describe("buildConfigFromUrl", () => {
@@ -55,6 +89,27 @@ describe("buildConfigFromUrl", () => {
   it("throws a TypeError for an invalid URL string", () => {
     expect(() => buildConfigFromUrl("not-a-url")).toThrow(TypeError);
     expect(() => buildConfigFromUrl("")).toThrow(TypeError);
+  });
+
+  it("derived brand name always contains only safe chars", () => {
+    const urls = [
+      "https://growthackers.io",
+      "https://my-brand.io",
+      "https://brand123.io",
+    ];
+    for (const url of urls) {
+      const cfg = buildConfigFromUrl(url);
+      expect(cfg.brand.name).toMatch(/^[a-zA-Z0-9-]+$/);
+      expect(cfg.brand.name.length).toBeLessThanOrEqual(50);
+    }
+  });
+
+  it("truncates brand name from a very long hostname segment to max 50 chars", () => {
+    // 60-char first segment — all valid URL chars (hyphens + alphanum)
+    const longSegment = "a-very-very-long-brand-name-that-exceeds-fifty-chars-limit";
+    const cfg = buildConfigFromUrl(`https://${longSegment}.io`);
+    expect(cfg.brand.name.length).toBeLessThanOrEqual(50);
+    expect(cfg.brand.name).toMatch(/^[a-zA-Z0-9-]*$/);
   });
 });
 
