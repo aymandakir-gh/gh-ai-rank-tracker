@@ -14,6 +14,7 @@
  *   - In-memory sliding-window rate limit: 10 requests / IP / minute.
  *   - Input validated before any provider instantiation.
  *   - Aegis input guard: prompt-injection + jailbreak detection (set AEGIS_ENABLED=true to activate).
+ *   - brandName sanitization: strips non-alphanum/hyphen chars, caps at 50 chars (OWASP A03).
  */
 
 import { timingSafeEqual } from "crypto";
@@ -113,6 +114,27 @@ function safeCompare(a: string, b: string): boolean {
 }
 
 /**
+ * Sanitize a raw brand name derived from URL parsing.
+ *
+ * Defense-in-depth (OWASP A03): even though the URL is already validated by
+ * `new URL()`, the derived brand name is used in prompts sent to AI engines
+ * and potentially displayed in the UI. This guard ensures only safe chars
+ * (alphanumeric + hyphen) survive and the length is bounded.
+ *
+ * Rules:
+ *   - Strip any character not in [a-zA-Z0-9-]
+ *   - Truncate to 50 characters
+ *
+ * @example
+ *   sanitizeBrandName("Acme")           → "Acme"          (clean, unchanged)
+ *   sanitizeBrandName("<script>xss")    → "scriptxss"     (angle brackets stripped)
+ *   sanitizeBrandName("A".repeat(100))  → "A".repeat(50)  (truncated)
+ */
+export function sanitizeBrandName(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 50);
+}
+
+/**
  * Derive a TrackingConfig from a brand URL.
  * Uses the standard demo prompt set; brand name + domain inferred from URL.
  * Throws TypeError on an invalid URL string.
@@ -121,10 +143,12 @@ export function buildConfigFromUrl(rawUrl: string): TrackingConfig {
   const parsed = new URL(rawUrl); // throws TypeError on invalid input
   const hostname = parsed.hostname.replace(/^www\./, "");
   const [firstPart] = hostname.split(".");
-  const brandName =
+  const rawBrandName =
     firstPart
       ? firstPart.charAt(0).toUpperCase() + firstPart.slice(1)
       : hostname;
+  // Sanitize: strip non-alphanum/hyphen chars and cap at 50 chars (OWASP A03)
+  const brandName = sanitizeBrandName(rawBrandName);
   return {
     brand: { name: brandName, domain: hostname, aliases: [hostname] },
     prompts: demoConfig.prompts,
