@@ -20,6 +20,7 @@ import {
   FormEvent,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
+import posthog from 'posthog-js';
 import type { WebScanResult, EmailGateState } from '@/lib/types';
 
 // ─── URL codec ────────────────────────────────────────────────────────────────
@@ -362,6 +363,16 @@ function ResultsContent() {
   );
 
   const [gateState, setGateState] = useState<EmailGateState>('idle');
+
+  // PostHog: fire once when a valid result is decoded
+  // Must be declared before any early return (React hooks rules)
+  useEffect(() => {
+    if (!result) return;
+    posthog.capture('scan_results_viewed', {
+      visibility_score: result.visibilityScore,
+      brand_name: result.brandName,
+    });
+  }, [result]);
 
   const handleShare = useCallback(() => {
     setGateState('modal_open');
@@ -726,7 +737,7 @@ function LoadingFallback() {
   );
 }
 
-// ─── Page export ─────────────────────────────────────────────────────────────
+// ─── Page export ──────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   return (
