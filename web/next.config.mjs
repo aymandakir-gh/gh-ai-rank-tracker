@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -6,6 +7,9 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
   webpack: (config) => {
     // Resolve @engine → ../src/web.ts (avoids pulling in Hono from src/index.ts)
     config.resolve.alias['@engine'] = path.join(__dirname, '../src/web.ts');
@@ -19,4 +23,9 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+  widenClientFileUpload: false,
+});
