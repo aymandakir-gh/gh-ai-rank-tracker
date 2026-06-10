@@ -171,7 +171,7 @@ export default function HomePage() {
             />
             <span className="text-sm text-gray-300">
               Use demo data{' '}
-              <span className="text-gray-500">(GrowthHackers sample — no API keys needed)</span>
+              <span className="text-gray-400">(GrowthHackers sample — no API keys needed)</span>
             </span>
           </label>
 
@@ -212,7 +212,7 @@ export default function HomePage() {
                   className="block text-sm text-gray-300 mb-1"
                 >
                   Domain{' '}
-                  <span className="text-gray-500">(optional)</span>
+                  <span className="text-gray-400">(optional)</span>
                 </label>
                 <input
                   id="brand-domain"
@@ -234,7 +234,7 @@ export default function HomePage() {
                   className="block text-sm text-gray-300 mb-1"
                 >
                   Aliases{' '}
-                  <span className="text-gray-500">(comma-separated, optional)</span>
+                  <span className="text-gray-400">(comma-separated, optional)</span>
                 </label>
                 <input
                   id="brand-aliases"
@@ -282,7 +282,7 @@ export default function HomePage() {
                     onClick={() => removePrompt(idx)}
                     disabled={loading || prompts.length <= 1}
                     aria-label={`Remove prompt: ${p.text}`}
-                    className="shrink-0 px-1 text-sm text-gray-500 hover:text-red-400
+                    className="shrink-0 px-1 text-sm text-gray-400 hover:text-red-400
                                disabled:opacity-30 transition-colors"
                   >
                     ✕
@@ -325,7 +325,7 @@ export default function HomePage() {
           <section className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Competitors{' '}
-              <span className="font-normal text-gray-500 normal-case">(optional)</span>
+              <span className="font-normal text-gray-400 normal-case">(optional)</span>
             </h2>
 
             {competitors.length > 0 && (
@@ -335,7 +335,7 @@ export default function HomePage() {
                     <span className="flex-1">
                       {c.name}
                       {c.domain && (
-                        <span className="ml-1 text-gray-500">({c.domain})</span>
+                        <span className="ml-1 text-gray-400">({c.domain})</span>
                       )}
                     </span>
                     <button
@@ -343,7 +343,7 @@ export default function HomePage() {
                       onClick={() => removeCompetitor(idx)}
                       disabled={loading}
                       aria-label={`Remove competitor: ${c.name}`}
-                      className="px-1 text-sm text-gray-500 hover:text-red-400
+                      className="px-1 text-sm text-gray-400 hover:text-red-400
                                  disabled:opacity-30 transition-colors"
                     >
                       ✕
