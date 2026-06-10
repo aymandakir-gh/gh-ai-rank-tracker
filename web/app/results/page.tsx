@@ -502,7 +502,7 @@ function ResultsContent() {
             />
             <MetricBar
               label="Mention Prominence"
-              value={breakdown.mentionProminence * 100}
+              value={breakdown.mentionProminence}
               barClass="bg-brand-400"
             />
             <MetricBar
@@ -512,7 +512,7 @@ function ResultsContent() {
             />
             <MetricBar
               label="Citation Prominence"
-              value={breakdown.citationProminence * 100}
+              value={breakdown.citationProminence}
               barClass="bg-emerald-400"
             />
           </div>
@@ -726,7 +726,7 @@ function LoadingFallback() {
   );
 }
 
-// ─── Page export (Suspense boundary required for useSearchParams) ─────────────
+// ─── Page export ─────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   return (
