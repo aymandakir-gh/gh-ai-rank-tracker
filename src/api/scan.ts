@@ -38,13 +38,62 @@ export interface RateLimiter {
 /** In-memory sliding-window rate limiter. Thread-safe for single-process deployments. */
 export class InMemoryRateLimiter implements RateLimiter {
   private readonly map = new Map<string, number[]>();
+  private callCount = 0;
+  private readonly pruneEvery: number;
 
+  /**
+   * @param windowMs     Sliding window length in milliseconds (default 60 000).
+   * @param maxRequests  Max requests allowed per IP within the window (default 10).
+   * @param pruneEvery   Auto-prune dead-IP entries every N check() calls (default 100).
+   *                     Pass a large number (e.g. 999_999) to disable auto-pruning in tests.
+   */
   constructor(
     private readonly windowMs = 60_000,
     private readonly maxRequests = 10,
-  ) {}
+    pruneEvery = 100,
+  ) {
+    this.pruneEvery = pruneEvery;
+  }
+
+  /**
+   * Remove all IP entries whose entire timestamp set has expired.
+   *
+   * Without pruning, the internal Map grows unbounded: every unique IP that
+   * ever makes a request leaves a stale entry after its window expires. On
+   * long-running instances with many unique IPs (crawlers, scanners, rotated
+   * proxies) this causes a slow memory leak.
+   *
+   * `prune()` iterates the Map once and deletes any entry where no timestamp
+   * falls inside the current window. It is safe to call at any time — active
+   * IPs (with at least one in-window timestamp) are never removed.
+   *
+   * Called automatically inside check() every `pruneEvery` invocations.
+   * May also be called externally (e.g., from a maintenance cron).
+   */
+  prune(): void {
+    const now = Date.now();
+    const cutoff = now - this.windowMs;
+    for (const [ip, timestamps] of this.map) {
+      if (!timestamps.some((t) => t > cutoff)) {
+        this.map.delete(ip);
+      }
+    }
+  }
+
+  /**
+   * Number of IPs currently tracked in the internal map.
+   * Exposed for testing/observability — not part of the RateLimiter interface.
+   */
+  get mapSize(): number {
+    return this.map.size;
+  }
 
   check(ip: string): boolean {
+    // Auto-prune every `pruneEvery` calls to cap Map growth from dead IPs.
+    if (++this.callCount % this.pruneEvery === 0) {
+      this.prune();
+    }
+
     const now = Date.now();
     const cutoff = now - this.windowMs;
     const timestamps = (this.map.get(ip) ?? []).filter((t) => t > cutoff);
