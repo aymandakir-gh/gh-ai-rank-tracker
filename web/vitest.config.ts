@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    globals: false,
+    globals: true,          // required by @testing-library/jest-dom setup
     setupFiles: ['./tests/setup.ts'],
   },
   resolve: {

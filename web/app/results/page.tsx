@@ -372,6 +372,11 @@ function ResultsContent() {
       visibility_score: result.visibilityScore,
       brand_name: result.brandName,
     });
+    // OBS-2: score_completed is the canonical required event per observability spec
+    posthog.capture('score_completed', {
+      visibility_score: result.visibilityScore,
+      brand_name: result.brandName,
+    });
   }, [result]);
 
   const handleShare = useCallback(() => {
@@ -392,6 +397,13 @@ function ResultsContent() {
           visibilityScore: result?.visibilityScore,
         }),
       }).catch(() => {/* intentional fail-open */});
+
+      // OBS-2: lead_captured event (fires regardless of backend status — fail-open)
+      posthog.capture('lead_captured', {
+        brand_name: result?.brandName,
+        visibility_score: result?.visibilityScore,
+        source: 'ai-rank-tracker',
+      });
 
       // Copy URL to clipboard
       try {

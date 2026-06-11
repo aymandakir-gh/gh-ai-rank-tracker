@@ -149,6 +149,13 @@ export default function HomePage() {
         prompt_count: prompts.length,
       });
 
+      // OBS-2: demo_used fires when a demo scan completes successfully
+      if (useDemo) {
+        posthog.capture('demo_used', {
+          visibility_score: data.result.visibilityScore,
+        });
+      }
+
       const token = encodeResult(data.result);
       router.push(`/results?r=${encodeURIComponent(token)}`);
     } catch (err) {
