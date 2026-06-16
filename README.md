@@ -2,9 +2,12 @@
 
 > **Track whether AI answer engines mention and cite your brand.** A GEO / AEO visibility & share-of-voice tracker for the age of ChatGPT, Perplexity, Google AI Overviews and Gemini.
 
-![status](https://img.shields.io/badge/status-v0.3%20API%20%2B%20Web%20UI-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![node](https://img.shields.io/badge/node-%3E%3D20-339933) ![tests](https://img.shields.io/badge/tests-vitest-6E9F18)
+![status](https://img.shields.io/badge/status-v0.4%20live%20adapters-blue) [![CI](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml) ![license](https://img.shields.io/badge/license-MIT-green) ![node](https://img.shields.io/badge/node-%3E%3D20-339933) ![tests](https://img.shields.io/badge/tests-vitest-6E9F18)
 
-<!-- hero screenshot / GIF placeholder — add a terminal recording of `npm run demo` here -->
+<!-- DEMO PLACEHOLDER — replace with a terminal recording of `npm run demo`.
+     See "Recording the demo" below for the vhs / asciinema steps.
+     ![demo](docs/demo.gif) -->
+![demo placeholder](https://img.shields.io/badge/demo-record%20with%20vhs%20%E2%86%92%20docs%2Fdemo.gif-lightgrey)
 
 Search is moving from ten blue links to a single AI-generated answer. If the answer engine doesn't mention or cite you, you're invisible — and classic rank trackers can't see it. **gh-ai-rank-tracker** measures your presence *inside the answers*: are you named, how prominently, are you cited, and how do you stack up against competitors.
 
@@ -27,7 +30,7 @@ This tool turns those questions into a single, repeatable **AI Visibility Score 
 - **Share of voice** — benchmark presence and mention volume against any set of competitors.
 - **Coverage + gaps** — see exactly which prompts return zero mentions of you.
 - **Recommendations** — prioritized, rule-based next steps (high / medium / low).
-- **Pluggable engines** — a clean `AnswerEngineProvider` interface; ships a deterministic `MockProvider` so the whole engine runs offline and is fully unit-tested.
+- **Live answer engines** — first-class adapters for **OpenAI**, **Perplexity** and **Anthropic** (Claude), all behind your own API keys and all implementing one `AnswerEngineProvider` interface. The deterministic `MockProvider` is the no-key default, so the whole engine still runs offline and is fully unit-tested.
 - **Reports** — console, Markdown, or raw JSON.
 
 ## Install
@@ -94,9 +97,9 @@ Each (brand, response) pair earns up to 100 points from four signals (weights ar
 
 Per-prompt scores are the mean across engines; the overall **AI Visibility Score** is the prompt-weighted average.
 
-## Connecting real answer engines
+## Live answer engines
 
-v0.1 ships the deterministic `MockProvider` so the scoring engine is fully testable offline. Live adapters implement the same interface:
+The scoring engine is provider-agnostic — every engine implements one interface:
 
 ```ts
 export interface AnswerEngineProvider {
@@ -105,7 +108,76 @@ export interface AnswerEngineProvider {
 }
 ```
 
-Bring your own keys and plug in Perplexity, OpenAI, Gemini or a Google AI Overviews scraper — the scoring, share-of-voice and reporting all work unchanged.
+v0.4 ships three **live** adapters alongside the offline `MockProvider`. Each
+reads its key from the environment only (never committed) and uses the
+provider's web-search capability so answers come back with real source
+citations:
+
+| Provider | `--provider` value | Env var | Model override | Default model |
+|---|---|---|---|---|
+| Mock (offline default) | `mock` | — | — | — |
+| OpenAI | `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-4o` |
+| Perplexity | `perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_MODEL` | `sonar` |
+| Anthropic (Claude) | `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` |
+
+### Setup
+
+Copy the example env file and fill in only the keys you have — any provider
+whose key is missing simply isn't available (the others still work):
+
+```bash
+cp .env.example .env       # then edit .env
+# or export inline:
+export OPENAI_API_KEY=sk-...
+export PERPLEXITY_API_KEY=pplx-...
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Run against a live engine (one-liner)
+
+```bash
+# Quick analysis of a brand URL with a live engine:
+OPENAI_API_KEY=sk-... npm run cli -- --provider openai --url https://yourbrand.com --markdown
+PERPLEXITY_API_KEY=pplx-... npm run cli -- --provider perplexity --url https://yourbrand.com
+ANTHROPIC_API_KEY=sk-ant-... npm run cli -- --provider anthropic --config ./examples/demo-config.json
+```
+
+Or from code:
+
+```ts
+import { runTracking, OpenAIProvider, AnthropicProvider } from "gh-ai-rank-tracker";
+
+const report = await runTracking(config, [
+  new OpenAIProvider(),     // reads OPENAI_API_KEY
+  new AnthropicProvider(),  // reads ANTHROPIC_API_KEY
+]);
+```
+
+> **Cost note:** live providers make real, billable API calls. The CLI and
+> library never call out unless you select a live `--provider`; the default is
+> always the offline `MockProvider`.
+
+## Recording the demo
+
+The hero placeholder above should be replaced with a short terminal recording
+of `npm run demo`. Record it with [vhs](https://github.com/charmbracelet/vhs)
+(scriptable, reproducible) or [asciinema](https://asciinema.org/):
+
+```bash
+# Option A — vhs (renders straight to a GIF)
+#   docs/demo.tape:
+#     Output docs/demo.gif
+#     Set Width 1200
+#     Type "npm run demo" Enter
+#     Sleep 4s
+vhs docs/demo.tape          # → docs/demo.gif, then reference it in the placeholder above
+
+# Option B — asciinema
+asciinema rec docs/demo.cast -c "npm run demo"
+```
+
+Commit the resulting `docs/demo.gif` (or `.cast`) and swap it into the
+`<!-- DEMO PLACEHOLDER -->` block at the top of this README.
 
 ## API
 
@@ -130,7 +202,7 @@ Request body:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `url` | string | ✅ | Brand URL — name + domain inferred automatically |
-| `providers` | string[] | ❌ | `"mock"` or `"perplexity"` (default: `["mock"]`) |
+| `providers` | string[] | ❌ | any of `"mock"`, `"perplexity"`, `"openai"`, `"anthropic"` (default: `["mock"]`). Live providers require the matching API key in the server env. |
 
 ## Deploy
 
@@ -143,6 +215,8 @@ Request body:
    |---|---|---|
    | `SCAN_API_KEY` | ✅ | Bearer token for API auth — generate with `openssl rand -hex 32` |
    | `PERPLEXITY_API_KEY` | Only for `provider=perplexity` | Perplexity API key |
+   | `OPENAI_API_KEY` | Only for `provider=openai` | OpenAI API key |
+   | `ANTHROPIC_API_KEY` | Only for `provider=anthropic` | Anthropic API key |
    | `PORT` | ❌ | Injected automatically by Railway |
 
 3. **Deploy** — Railway picks up `railway.toml` automatically:
@@ -175,9 +249,11 @@ SCAN_API_URL=http://localhost:3000 npm run dev
 - [x] Core scoring engine (mention + citation + share of voice + gaps)
 - [x] REST API (Hono, Bearer auth, rate limiting)
 - [x] Web UI (Next.js, i18n 9 languages, a11y)
-- [ ] Live provider adapters (Perplexity ✅ beta, OpenAI, Gemini, Google AI Overviews)
+- [x] Live provider adapters — OpenAI, Perplexity, Anthropic (Claude)
+- [x] Email gate + lead capture (web)
+- [x] Observability — Sentry + PostHog on the web app (graceful-degrade)
+- [ ] More engines — Gemini, Google AI Overviews
 - [ ] Scheduled runs + historical trend tracking
-- [ ] Email gate + lead capture
 
 ## Built by GrowthHackers
 
