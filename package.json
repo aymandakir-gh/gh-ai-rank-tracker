@@ -1,6 +1,6 @@
 {
   "name": "gh-ai-rank-tracker",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Track whether AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini) mention and cite your brand. A GEO/AEO visibility & share-of-voice tracker.",
   "type": "module",
   "license": "MIT",

@@ -32,7 +32,7 @@ import { InMemoryStore, type TrackingStore } from "../store";
 import { demoConfig, demoCampaign, demoProviders } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
 
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 

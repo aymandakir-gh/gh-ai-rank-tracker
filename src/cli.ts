@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { runTracking } from "./tracker";
 import { renderConsole, renderMarkdown } from "./report";
+import { renderCampaignMarkdown } from "./export/markdown";
+import { renderCampaignPdf } from "./export/pdf";
 import { MockProvider, type AnswerEngineProvider } from "./providers";
 import { PerplexityProvider } from "./providers/perplexity";
 import { OpenAIProvider } from "./providers/openai";
@@ -38,6 +40,7 @@ Campaigns (tracking over time):
   gh-ai-rank-tracker campaign run --config <campaign.json> [--provider <p>]
   gh-ai-rank-tracker campaign list                        List stored campaigns + run counts
   gh-ai-rank-tracker campaign history <campaignId> [--json]   Show the trend over time
+  gh-ai-rank-tracker campaign export <campaignId> --format md|pdf --out <file>  Export a report
 
 Flags:
   --demo                  Use the bundled demo config with scripted engines
@@ -253,6 +256,55 @@ async function campaignHistory(argv: string[]): Promise<void> {
   }
 }
 
+/** Read a flag value (e.g. --format md) from argv. */
+function flagValue(argv: string[], ...names: string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    if (names.includes(argv[i]!)) return argv[i + 1];
+  }
+  return undefined;
+}
+
+async function campaignExport(argv: string[]): Promise<void> {
+  const store = resolveStore(argv);
+  const id = positionals(argv)[0];
+  const format = (flagValue(argv, "--format", "-f") ?? "md").toLowerCase();
+  const out = flagValue(argv, "--out", "-o");
+
+  if (!id) {
+    console.error("[gh-ai-rank-tracker] campaign export needs a <campaignId>.");
+    process.exitCode = 1;
+    return;
+  }
+  if (!out) {
+    console.error("[gh-ai-rank-tracker] campaign export needs --out <file>.");
+    process.exitCode = 1;
+    return;
+  }
+  if (format !== "md" && format !== "markdown" && format !== "pdf") {
+    console.error(`[gh-ai-rank-tracker] Unknown --format "${format}". Use: md | pdf.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const runs = await store.getRuns(id);
+  const latest = runs[runs.length - 1];
+  if (!latest) {
+    console.error(`[gh-ai-rank-tracker] No runs recorded for campaign "${id}".`);
+    process.exitCode = 1;
+    return;
+  }
+  const trend = computeTrend(runs);
+  const campaignName = (await store.getCampaign(id))?.name;
+
+  if (format === "pdf") {
+    const bytes = renderCampaignPdf(latest, trend, campaignName);
+    writeFileSync(out, bytes);
+  } else {
+    writeFileSync(out, renderCampaignMarkdown(latest, trend, campaignName), "utf8");
+  }
+  console.log(`[gh-ai-rank-tracker] Wrote ${format.toUpperCase()} report for "${id}" → ${out}`);
+}
+
 async function runCampaignSubcommand(argv: string[]): Promise<void> {
   const sub = argv[0];
   const rest = argv.slice(1);
@@ -263,10 +315,12 @@ async function runCampaignSubcommand(argv: string[]): Promise<void> {
       return campaignList(rest);
     case "history":
       return campaignHistory(rest);
+    case "export":
+      return campaignExport(rest);
     default:
       console.error(
         `[gh-ai-rank-tracker] Unknown campaign subcommand "${sub ?? ""}". ` +
-          `Use: run | list | history.`,
+          `Use: run | list | history | export.`,
       );
       process.exitCode = 1;
   }

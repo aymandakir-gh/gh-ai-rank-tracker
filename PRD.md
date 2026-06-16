@@ -131,12 +131,17 @@ keyless and accumulates history on repeat runs; single-run degradation noted.
 `src/export/pdf.ts` (`renderCampaignPdf` → bytes). CLI `campaign export
 --format md|pdf --out <file>`. Optional web download of the current run.
 
-**Definition of Done**
-- [ ] Markdown export contains score, trend, engine breakdown, competitor
-      comparison, per-prompt table — asserted.
-- [ ] PDF bytes start `%PDF-`, end `%%EOF`, carry a valid xref whose offsets
-      point at real objects, and embed the brand name + score text — asserted.
-- [ ] CLI writes both formats; round-trip verified end-to-end.
+**Definition of Done** — ✅ shipped (tag v0.8.0)
+- [x] `renderCampaignMarkdown` contains score, trend, engine breakdown,
+      competitor comparison, per-prompt table — asserted.
+- [x] `renderCampaignPdf`/`buildTextPdf` bytes start `%PDF-1.4`, end `%%EOF`,
+      carry a valid xref whose offsets each point at the real object, paginate
+      long content, and embed the brand name + score text — all asserted.
+      `file(1)` recognizes the output as a valid PDF 1.4.
+- [x] CLI `campaign export --format md|pdf --out <file>` writes both formats;
+      verified end-to-end from the dist build. Bonus: web dashboard "Download
+      report (.md)" button (i18n'd in all 9 locales) + `webCampaignToMarkdown`.
+- [x] Engine **275✓/4 skip** (+9), web **142✓** (+4); typecheck + both builds green.
 
 ## M5 — v0.9.0 · Methodology + launch docs + demo
 

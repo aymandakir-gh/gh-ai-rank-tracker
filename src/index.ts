@@ -14,6 +14,9 @@ export * from "./report";
 export * from "./campaign";
 export * from "./store";
 export * from "./trends";
+export { renderCampaignMarkdown } from "./export/markdown";
+export { renderCampaignPdf, buildTextPdf, sanitizeAscii, escapePdfText } from "./export/pdf";
+export type { PdfLine } from "./export/pdf";
 export {
   demoConfig,
   demoProviders,

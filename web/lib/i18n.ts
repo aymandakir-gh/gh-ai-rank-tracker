@@ -404,6 +404,7 @@ const CAMPAIGN_KEYS = [
   'campaign.prompts.mentions',
   'campaign.prompts.citations',
   'campaign.prompts.none',
+  'campaign.export',
 ] as const
 
 const campaignValues: Record<Locale, readonly string[]> = {
@@ -416,7 +417,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Share of voice over time', 'Visibility', 'Share of voice',
     'Run this campaign again over time to build a trend.', 'Change since first run',
     'Per-engine breakdown', 'Mention rate', 'Citation rate', 'Competitor comparison', 'you',
-    'Per-prompt drill-down', 'Mentions', 'Citations', 'No citations',
+    'Per-prompt drill-down', 'Mentions', 'Citations', 'No citations', 'Download report (.md)',
   ],
   ar: [
     'الحملات', 'لوحة الحملات',
@@ -427,7 +428,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'حصة الصوت عبر الزمن', 'الظهور', 'حصة الصوت',
     'شغّل هذه الحملة مجدداً عبر الزمن لبناء اتجاه.', 'التغيّر منذ أول تشغيل',
     'التفصيل حسب المحرّك', 'معدل الإشارة', 'معدل الاستشهاد', 'مقارنة المنافسين', 'أنت',
-    'تفصيل حسب السؤال', 'الإشارات', 'الاستشهادات', 'لا استشهادات',
+    'تفصيل حسب السؤال', 'الإشارات', 'الاستشهادات', 'لا استشهادات', 'تنزيل التقرير (.md)',
   ],
   it: [
     'Campagne', 'Dashboard campagne',
@@ -438,7 +439,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Share of voice nel tempo', 'Visibilità', 'Share of voice',
     'Esegui di nuovo questa campagna nel tempo per costruire un trend.', 'Variazione dalla prima esecuzione',
     'Dettaglio per motore', 'Tasso di menzione', 'Tasso di citazione', 'Confronto concorrenti', 'tu',
-    'Dettaglio per prompt', 'Menzioni', 'Citazioni', 'Nessuna citazione',
+    'Dettaglio per prompt', 'Menzioni', 'Citazioni', 'Nessuna citazione', 'Scarica report (.md)',
   ],
   nl: [
     'Campagnes', 'Campagne-dashboard',
@@ -449,7 +450,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Share of voice in de tijd', 'Zichtbaarheid', 'Share of voice',
     'Voer deze campagne in de tijd opnieuw uit om een trend op te bouwen.', 'Verandering sinds de eerste run',
     'Uitsplitsing per engine', 'Vermeldingsgraad', 'Citatiegraad', 'Concurrentievergelijking', 'jij',
-    'Uitsplitsing per prompt', 'Vermeldingen', 'Citaties', 'Geen citaties',
+    'Uitsplitsing per prompt', 'Vermeldingen', 'Citaties', 'Geen citaties', 'Rapport downloaden (.md)',
   ],
   zh: [
     '活动', '活动仪表板',
@@ -460,7 +461,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     '声量份额随时间变化', '可见度', '声量份额',
     '随时间再次运行此活动以构建趋势。', '自首次运行以来的变化',
     '按引擎细分', '提及率', '引用率', '竞争对手对比', '您',
-    '按提示词细分', '提及', '引用', '无引用',
+    '按提示词细分', '提及', '引用', '无引用', '下载报告 (.md)',
   ],
   es: [
     'Campañas', 'Panel de campañas',
@@ -471,7 +472,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Cuota de voz a lo largo del tiempo', 'Visibilidad', 'Cuota de voz',
     'Ejecuta esta campaña de nuevo a lo largo del tiempo para crear una tendencia.', 'Cambio desde la primera ejecución',
     'Desglose por motor', 'Tasa de mención', 'Tasa de citación', 'Comparación de competidores', 'tú',
-    'Desglose por prompt', 'Menciones', 'Citas', 'Sin citas',
+    'Desglose por prompt', 'Menciones', 'Citas', 'Sin citas', 'Descargar informe (.md)',
   ],
   fr: [
     'Campagnes', 'Tableau de bord des campagnes',
@@ -482,7 +483,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Part de voix au fil du temps', 'Visibilité', 'Part de voix',
     'Relancez cette campagne au fil du temps pour construire une tendance.', 'Évolution depuis la première exécution',
     'Détail par moteur', 'Taux de mention', 'Taux de citation', 'Comparaison des concurrents', 'vous',
-    'Détail par prompt', 'Mentions', 'Citations', 'Aucune citation',
+    'Détail par prompt', 'Mentions', 'Citations', 'Aucune citation', 'Télécharger le rapport (.md)',
   ],
   de: [
     'Kampagnen', 'Kampagnen-Dashboard',
@@ -493,7 +494,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Share of Voice im Zeitverlauf', 'Sichtbarkeit', 'Share of Voice',
     'Führen Sie diese Kampagne im Zeitverlauf erneut aus, um einen Trend aufzubauen.', 'Veränderung seit dem ersten Lauf',
     'Aufschlüsselung pro Engine', 'Erwähnungsrate', 'Zitationsrate', 'Wettbewerbsvergleich', 'Sie',
-    'Aufschlüsselung pro Prompt', 'Erwähnungen', 'Zitate', 'Keine Zitate',
+    'Aufschlüsselung pro Prompt', 'Erwähnungen', 'Zitate', 'Keine Zitate', 'Bericht herunterladen (.md)',
   ],
   'pt-br': [
     'Campanhas', 'Painel de campanhas',
@@ -504,7 +505,7 @@ const campaignValues: Record<Locale, readonly string[]> = {
     'Participação de voz ao longo do tempo', 'Visibilidade', 'Participação de voz',
     'Execute esta campanha novamente ao longo do tempo para construir uma tendência.', 'Variação desde a primeira execução',
     'Detalhamento por motor', 'Taxa de menção', 'Taxa de citação', 'Comparação de concorrentes', 'você',
-    'Detalhamento por prompt', 'Menções', 'Citações', 'Sem citações',
+    'Detalhamento por prompt', 'Menções', 'Citações', 'Sem citações', 'Baixar relatório (.md)',
   ],
 }
 

@@ -12,6 +12,7 @@ import { Suspense, useCallback, useMemo, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LanguageProvider } from '@/components/LanguageProvider';
 import { TrendChart } from '@/components/TrendChart';
+import { webCampaignToMarkdown } from '@/lib/report-markdown';
 import {
   LOCALE_LABELS,
   isLocale,
@@ -80,6 +81,19 @@ function Dashboard({ result, locale }: { result: WebCampaignResult; locale: Loca
     [result.competitors],
   );
 
+  const downloadMarkdown = useCallback(() => {
+    const md = webCampaignToMarkdown(result);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${result.brand.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-ai-visibility.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [result]);
+
   return (
     <div className="space-y-6">
       {/* Score + deltas */}
@@ -108,6 +122,13 @@ function Dashboard({ result, locale }: { result: WebCampaignResult; locale: Loca
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={downloadMarkdown}
+          className="ml-auto rounded-lg border border-white/10 px-4 py-2 text-sm text-brand-400 hover:bg-white/5 transition-colors"
+        >
+          {t('campaign.export')}
+        </button>
       </section>
 
       {/* Trend */}

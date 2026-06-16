@@ -116,6 +116,43 @@ describe('Campaign dashboard — demo flow', () => {
   })
 })
 
+describe('Campaign dashboard — export', () => {
+  test('Download report builds a markdown blob and triggers a download', async () => {
+    mockFetchOnce(DEMO_RESULT)
+    // Capture the markdown by stubbing Blob (jsdom's Blob lacks .text()), plus
+    // the URL + anchor-click plumbing.
+    let captured = ''
+    const RealBlob = global.Blob
+    global.Blob = class {
+      type: string
+      constructor(parts: unknown[], opts?: { type?: string }) {
+        captured = String((parts ?? [])[0] ?? '')
+        this.type = opts?.type ?? ''
+      }
+    } as unknown as typeof Blob
+    const createUrl = vi.fn((_blob: Blob) => 'blob:mock')
+    const revokeUrl = vi.fn((_url: string) => undefined)
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: revokeUrl })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      render(<CampaignPage />)
+      await userEvent.click(screen.getByRole('button', { name: /load demo campaign/i }))
+      await waitFor(() =>
+        expect(screen.getByRole('img', { name: /share of voice over time/i })).toBeInTheDocument(),
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: /download report/i }))
+      expect(createUrl).toHaveBeenCalledTimes(1)
+      expect(captured).toContain('# AI Visibility Report — GrowthHackers')
+      expect(clickSpy).toHaveBeenCalled()
+      expect(revokeUrl).toHaveBeenCalled()
+    } finally {
+      global.Blob = RealBlob
+    }
+  })
+})
+
 describe('Campaign dashboard — i18n', () => {
   test('renders French copy when ?lang=fr', () => {
     mockGet.mockImplementation((k: string) => (k === 'lang' ? 'fr' : null))

@@ -3,6 +3,24 @@
 Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
 v0.4.0 history is in [PLAN.md](PLAN.md).
 
+## Release: v0.8.0 ✅ — Exportable campaign report (Markdown + PDF)
+
+- **Goal met (item 6).** Two exporters over a `CampaignRun` + `Trend`:
+  - `renderCampaignMarkdown` — score, SoV trend, per-engine breakdown,
+    competitor comparison, per-prompt table, recommendations.
+  - `renderCampaignPdf` — a **dependency-free, pure-TS PDF writer**
+    (`buildTextPdf`): base-14 Helvetica, multi-page pagination, ASCII-sanitized
+    text, and a cross-reference table whose byte offsets each point at the real
+    object. `file(1)` recognizes the output as a valid PDF 1.4.
+- **CLI:** `campaign export <id> --format md|pdf --out <file> [--store]`.
+- **Web bonus:** dashboard "Download report (.md)" button (i18n'd, 9 locales)
+  backed by `webCampaignToMarkdown` (operates on the mapped result; no engine
+  internals in the browser bundle).
+- **Tests:** +9 engine (`export.test.ts`, incl. xref-offset validation +
+  pagination + stream-length checks) → engine **275 + 4 skip**; +4 web
+  (`report-markdown`, download wiring) → web **142**. Verified end-to-end from
+  the dist build (wrote real `.md` + `.pdf`; `file` confirmed the PDF).
+
 ## Release: v0.7.0 ✅ — Web campaign dashboard (trends/engines/competitors/drill-down)
 
 - **Goal met (item 5 + web part of 3).** New `/campaign` dashboard: a
