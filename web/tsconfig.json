@@ -27,5 +27,9 @@
     ".next/types/**/*.ts",
     "../src/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  // The web app consumes the engine via @engine → ../src/web.ts (Hono-free).
+  // Exclude the Hono API entrypoints — they import `hono` / `@hono/node-server`,
+  // which are root-only deps not installed in the web project (CI typechecks web
+  // in isolation). They are covered by the root project's typecheck.
+  "exclude": ["node_modules", "../src/api", "../src/server.ts", "../src/index.ts"]
 }
