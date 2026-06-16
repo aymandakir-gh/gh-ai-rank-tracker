@@ -1,51 +1,57 @@
-# STATUS — v0.4.0
+# STATUS — v0.4.0 ✅
 
-Living status log for the v0.4.0 effort (live answer-engine adapters). Newest
-entries at the top. See [PLAN.md](PLAN.md) for the full gap analysis.
+Live answer-engine adapters shipped. See [PLAN.md](PLAN.md) for the original gap
+analysis. Newest entries at the top.
 
-## Current state
-- **Phase:** finishing — CI + release.
-- **Tests:** root 205 passing + 3 integration skipped (no keys); web 118 passing.
-- **Build:** `node dist/src/{cli,server}.js` verified end-to-end against MockProvider.
-- **Branches merged:** w4 (rate-limiter prune), obs-2 (Sentry+PostHog), w5 html-lang
-  (LangSync), w5 contrast (#5). CI workflow added (engine + web jobs).
+## Release: v0.4.0
+- **Goal met.** Live OpenAI + Perplexity + Anthropic adapters behind env keys,
+  MockProvider kept as the no-key default; skip-without-keys integration tests;
+  obs/sentry-posthog branch merged; all open issues + PRs resolved; CI green on
+  main; README env setup + demo-recording step. Version bumped to 0.4.0 and
+  tagged.
+- **Tests:** engine 208 passing + 3 live-integration skipped (no keys); web 118
+  passing + `next build` green.
+- **Runtime verified:** `node dist/src/cli.js --demo` and `node dist/src/server.js`
+  (CommonJS dist) both run end-to-end against MockProvider.
 
-## Decisions
-- **Live adapters** mirror `PerplexityProvider`: injectable `fetch`, exponential
-  backoff via shared `src/providers/http.ts#withRetry` (no retry on 4xx), typed
-  per-provider error classes. Web-search enabled so answers carry citations.
-  Defaults overridable via `OPENAI_MODEL` / `PERPLEXITY_MODEL` / `ANTHROPIC_MODEL`.
-  Perplexity default updated `llama-3.1-sonar-*` (retired) → `sonar`.
-- **Integration tests** (`tests/providers.integration.test.ts`) make real calls
-  but are `describe.skipIf(!key)` — green with no keys, runnable with them. CI
-  has no keys → skipped → no paid calls.
-- **Runnable build:** `dist` is emitted as CommonJS (`tsconfig.build.json` +
-  `dist/package.json` marker) so `npm start` / the `bin` actually run — the
-  prior extensionless-ESM emit crashed at runtime. Zero source-import edits;
-  typecheck/vitest/web config unchanged.
-- **Test layout:** web-coupled tests live under `web/tests/**`; root project is
-  pure engine/API. vitest 4 migration (`environmentMatchGlobs` removed). The
-  pre-existing red backend tests were test-expectation bugs (engine was correct).
-- **Lint gate:** no ESLint; `tsc --noEmit` (typecheck) is the CI static gate.
-- **Push to main** directly (per goal), conventional commits, tag at the end.
+## What shipped
+- **Adapters** (`src/providers/`): `OpenAIProvider` (Responses API + web_search),
+  `AnthropicProvider` (Messages API + web_search_20260209), `PerplexityProvider`
+  (default model → `sonar`). Shared `http.ts#withRetry` (exponential backoff, no
+  retry on 4xx, retry only the network call). Web-search citations; defensive
+  parsing. Models overridable via `*_MODEL` env vars. Wired into `buildProviders`
+  (Hono API), the CLI `--provider`, and `index.ts`.
+- **Tests:** fixture-based unit tests (zero network) + `describe.skipIf(!key)`
+  integration tests in `tests/providers.integration.test.ts`.
+- **Build:** CommonJS `dist` (`tsconfig.build.json` + `dist/package.json` marker)
+  so `npm start` / the bin run; `exports` map + `src` dropped from the tarball.
+- **Merges:** w4 (rate-limiter prune), obs-2 (Sentry+PostHog), w5 html-lang
+  (LangSync), w5 contrast (a11y).
+- **CI:** `.github/workflows/ci.yml` — engine (typecheck/build/test) + web
+  (typecheck/build/test). Green on main.
+- **Docs:** README live-provider env setup, one-line run, vhs/asciinema
+  demo-recording step; root `.env.example`.
 
 ## Issue / PR disposition
-- **#2 OBS-2** — resolved by merging obs-2 (Sentry + PostHog, graceful-degrade,
-  tests). Close.
-- **#4 locale zh vs zh-cn** — verified: `lib/i18n.ts` keys Chinese as `zh`, and
-  `LangSync` SUPPORTED matches. No functional change; fixed the misleading
-  "ZH-CN" docstring. Close as verified-correct.
-- **PR #7 / #1 / #3 / #5** — merged into main. **PR #6** (contrast-hygiene,
-  page.tsx only) is a strict subset of #5 → close as superseded.
+- **#2 OBS-2** — closed; shipped via #1 (Sentry + PostHog, graceful-degrade).
+- **#4 locale zh vs zh-cn** — closed verified-correct (`i18n.ts` keys `zh`;
+  LangSync matches; misleading docstring fixed).
+- **PRs #1/#3/#5/#7** — merged. **PR #6** — closed (superseded by #5). All
+  merged/superseded remote branches deleted; only `main` remains.
+
+## Review
+- A multi-agent adversarial review confirmed 5 findings before tagging; all
+  fixed (retry/parse separation + defensive parsing; Anthropic search-error
+  fallback; packaging exports/tarball; web `next build` in CI; dead
+  `next.config.ts` removed + source-map guard ported). Re-verified green.
 
 ## Checklist
 - [x] 1. PLAN.md + STATUS.md
 - [x] 2. Test-infra repair (both suites green)
 - [x] 3. OpenAI + Anthropic adapters wired (CLI, API, index)
 - [x] 4. Unit (fixture) + integration (skip-without-key) tests
-- [x] 5. Merge w4 / obs-2 / w5 html-lang / w5 contrast
-- [ ] 5b. Close PRs + delete branches
-- [ ] 6. Close issues #2 and #4
-- [x] 7. CI workflow added (pending first green run on push)
+- [x] 5. Merge w4 / obs-2 / w5 html-lang / w5 contrast; PRs closed; branches deleted
+- [x] 6. Close issues #2 and #4
+- [x] 7. CI workflow green on main
 - [x] 8. README env setup + demo-recording step
-- [ ] 9. Adversarial review → tag v0.4.0 → push
+- [x] 9. Adversarial review → fixes → tag v0.4.0

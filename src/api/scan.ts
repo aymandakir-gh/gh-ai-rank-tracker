@@ -28,7 +28,7 @@ import type { TrackingReport, TrackingConfig } from "../types";
 import { demoConfig } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
