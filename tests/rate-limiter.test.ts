@@ -156,3 +156,73 @@ describe("InMemoryRateLimiter — sliding window", () => {
     expect(limiter.check("")).toBe(false); // second call: blocked
   });
 });
+
+// ─── prune() tests ────────────────────────────────────────────────────────────
+//
+// All tests pass a large pruneEvery (999_999) to disable auto-pruning so we
+// can test manual prune() calls in isolation.
+
+describe("InMemoryRateLimiter — prune()", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("removes expired IP entries from the map after window expires", () => {
+    // pruneEvery=999_999 disables auto-prune so manual prune() is the only trigger
+    const limiter = new InMemoryRateLimiter(1_000, 10, 999_999);
+    limiter.check("dead.1");
+    limiter.check("dead.2");
+    limiter.check("dead.3");
+    expect(limiter.mapSize).toBe(3);
+
+    tick(1_001); // all three windows expired
+    limiter.prune();
+
+    expect(limiter.mapSize).toBe(0);
+  });
+
+  it("retains IPs with at least one timestamp still within the window", () => {
+    const limiter = new InMemoryRateLimiter(60_000, 10, 999_999);
+    limiter.check("will-expire");
+    limiter.check("will-survive");
+    expect(limiter.mapSize).toBe(2);
+
+    tick(30_000);
+    // Refresh will-survive — adds a t=30_000 timestamp into the window
+    limiter.check("will-survive");
+
+    tick(30_001); // will-expire's t=0 is now outside 60 s window; will-survive still has t=30_000
+    limiter.prune();
+
+    expect(limiter.mapSize).toBe(1); // only will-survive remains
+    // And will-survive is still functional — its timestamps are intact
+    expect(limiter.check("will-survive")).toBe(true);
+  });
+
+  it("auto-prunes dead IPs after pruneEvery check() calls", () => {
+    // pruneEvery=3 → prune fires on the 3rd check() call
+    const limiter = new InMemoryRateLimiter(1_000, 10, 3);
+    limiter.check("ip-a"); // call 1
+    limiter.check("ip-b"); // call 2
+    expect(limiter.mapSize).toBe(2);
+
+    tick(1_001); // both windows expired
+
+    // 3rd check() triggers auto-prune: ip-a + ip-b removed, ip-c added fresh
+    limiter.check("ip-c"); // call 3 → auto-prune fires
+
+    expect(limiter.mapSize).toBe(1); // only ip-c remains
+    expect(limiter.check("ip-c")).toBe(true); // ip-c is still live
+  });
+
+  it("prune() is safe (no-op) on an empty map", () => {
+    const limiter = new InMemoryRateLimiter(60_000, 10, 999_999);
+    expect(limiter.mapSize).toBe(0);
+    expect(() => limiter.prune()).not.toThrow();
+    expect(limiter.mapSize).toBe(0);
+  });
+});
