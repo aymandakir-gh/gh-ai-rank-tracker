@@ -1,5 +1,6 @@
 import type { TrackingConfig } from "./types";
-import { MockProvider, type AnswerEngineProvider } from "./providers";
+import { MockProvider, type AnswerEngineProvider, type MockAnswer } from "./providers";
+import { type Campaign, type CampaignRun, runCampaign } from "./campaign";
 
 /** A realistic demo config in GrowthHackers' own GEO category. */
 export const demoConfig: TrackingConfig = {
@@ -73,4 +74,77 @@ export function demoProviders(): AnswerEngineProvider[] {
   });
 
   return [perplexity, chatgpt];
+}
+
+// ─── Campaign demo (tracking-over-time) ────────────────────────────────────────
+
+/**
+ * The demo campaign — same brand/competitors/prompt set as {@link demoConfig},
+ * promoted to a named, repeatable {@link Campaign} so the store, trend chart and
+ * exported report all have realistic data without any API keys.
+ */
+export const demoCampaign: Campaign = {
+  id: "demo-growthhackers",
+  name: "GrowthHackers — GEO/AEO visibility",
+  brand: demoConfig.brand,
+  competitors: demoConfig.competitors,
+  prompts: demoConfig.prompts,
+  engines: ["perplexity", "chatgpt"],
+  createdAt: "2026-05-04T00:00:00.000Z",
+};
+
+/**
+ * Scripted engines for a given week of the demo history. GrowthHackers' coverage
+ * grows by one prompt per week (weeks 0..3), so the demo tells a real
+ * "our GEO improved over a month" story — a rising visibility + share-of-voice
+ * trend — all computed by the actual scoring engine, never hand-faked.
+ */
+export function demoProvidersForWeek(week: number): AnswerEngineProvider[] {
+  const prompts = demoCampaign.prompts.map((p) => p.prompt);
+  const ghCovered = Math.max(0, Math.min(prompts.length, week + 1));
+
+  const makeEngine = (engine: string): AnswerEngineProvider => {
+    const script: Record<string, MockAnswer> = {};
+    prompts.forEach((prompt, i) => {
+      if (i < ghCovered) {
+        script[prompt] = {
+          text: `For "${prompt}", GrowthHackers is a strong, data-driven option alongside HubSpot and Semrush.`,
+          citations: [
+            { url: "https://growthackers.io/", title: "GrowthHackers" },
+            { url: "https://hubspot.com/", title: "HubSpot" },
+          ],
+        };
+      } else {
+        script[prompt] = {
+          text: `For "${prompt}", teams often consider HubSpot and Semrush.`,
+          citations: [{ url: "https://hubspot.com/", title: "HubSpot" }],
+        };
+      }
+    });
+    return new MockProvider({
+      engine,
+      script,
+      fallback: { text: "HubSpot and Semrush are common picks in this space.", citations: [] },
+    });
+  };
+
+  return [makeEngine("perplexity"), makeEngine("chatgpt")];
+}
+
+/**
+ * A deterministic 4-week demo history (weekly Mondays in May 2026), each run
+ * produced by {@link runCampaign} with fixed dates + ids. Async because each
+ * point is a real scored campaign pass.
+ */
+export async function demoCampaignHistory(weeks = 4): Promise<CampaignRun[]> {
+  const runs: CampaignRun[] = [];
+  for (let w = 0; w < weeks; w++) {
+    const date = new Date(Date.UTC(2026, 4, 4 + w * 7, 9, 0, 0)); // Mon 04/11/18/25 May 2026
+    const run = await runCampaign(demoCampaign, demoProvidersForWeek(w), {
+      now: () => date,
+      idFactory: () => `demo_run_${w + 1}`,
+    });
+    runs.push(run);
+  }
+  return runs;
 }

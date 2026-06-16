@@ -13,6 +13,7 @@
  */
 import { serve } from "@hono/node-server";
 import { createApp } from "./api/scan";
+import { openStore } from "./store";
 
 const PORT = Number(process.env["PORT"] ?? 3000);
 const SCAN_API_KEY = process.env["SCAN_API_KEY"] ?? "";
@@ -30,7 +31,8 @@ if (!SCAN_API_KEY && !IS_DEV) {
   process.exit(1);
 }
 
-const app = createApp();
+// Local-first campaign persistence (JSON file; path via TRACKER_STORE_PATH).
+const app = createApp({ store: openStore() });
 
 const authMode = SCAN_API_KEY
   ? "bearer-auth"
@@ -44,6 +46,8 @@ serve({ fetch: app.fetch, port: PORT });
 
 console.log(`[gh-ai-rank-tracker] Ready.`);
 console.log(`  POST http://localhost:${PORT}/api/scan`);
+console.log(`  POST http://localhost:${PORT}/api/campaign      (run + persist a campaign)`);
+console.log(`  GET  http://localhost:${PORT}/api/campaign/:id   (history + trend)`);
 console.log(`  GET  http://localhost:${PORT}/health`);
 console.log(`[gh-ai-rank-tracker] Example:`);
 console.log(

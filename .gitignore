@@ -7,6 +7,9 @@ dist/
 # testing
 coverage/
 
+# local-first campaign store (default path)
+.tracker/
+
 # typescript
 *.tsbuildinfo
 

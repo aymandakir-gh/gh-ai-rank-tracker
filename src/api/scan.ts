@@ -18,17 +18,20 @@
  */
 
 import { timingSafeEqual } from "crypto";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { runTracking } from "../tracker";
 import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
 import { OpenAIProvider } from "../providers/openai";
 import { AnthropicProvider } from "../providers/anthropic";
 import type { TrackingReport, TrackingConfig } from "../types";
-import { demoConfig } from "../demo";
+import { runCampaign, type Campaign, type CampaignRun } from "../campaign";
+import { computeTrend, type Trend } from "../trends";
+import { InMemoryStore, type TrackingStore } from "../store";
+import { demoConfig, demoCampaign, demoProviders } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -130,6 +133,32 @@ export interface ScanResponse {
   error?: string;
 }
 
+/** Request body for POST /api/campaign. */
+export interface CampaignRequest {
+  /** Run the built-in demo campaign (no keys). Ignored when `campaign` is set. */
+  useDemo?: boolean;
+  /** A full campaign definition to run + persist. */
+  campaign?: Campaign;
+  /**
+   * Provider names to query in parallel.
+   * Supported: "mock" | "perplexity" | "openai" | "anthropic" | "gemini".
+   * Defaults to ["mock"]. Live providers require the matching env key.
+   */
+  providers?: string[];
+}
+
+/** JSON envelope returned by the campaign endpoints. */
+export interface CampaignResponse {
+  ok: boolean;
+  /** The run that was just executed (POST only). */
+  run?: CampaignRun;
+  /** Full persisted history for the campaign, oldest-first. */
+  history?: CampaignRun[];
+  /** Trend computed over the history. */
+  trend?: Trend;
+  error?: string;
+}
+
 /** Options for createApp — all fields injectable for testing. */
 export interface AppOptions {
   /**
@@ -145,6 +174,12 @@ export interface AppOptions {
    * In production set AEGIS_ENABLED=true; in tests inject a configured guard directly.
    */
   aegisGuard?: AegisGuard;
+  /**
+   * Campaign history store for /api/campaign. Defaults to an InMemoryStore
+   * (per-process, lost on restart) so tests never touch disk. The server
+   * entrypoint injects a JsonFileStore for real local-first persistence.
+   */
+  store?: TrackingStore;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -229,6 +264,52 @@ export function buildProviders(names: string[]): AnswerEngineProvider[] {
   });
 }
 
+/**
+ * Validate + normalize an untrusted campaign payload into a {@link Campaign}.
+ * Returns a typed error string instead of throwing, so the route maps it to 400.
+ */
+export function validateCampaign(input: unknown): { campaign: Campaign } | { error: string } {
+  if (typeof input !== "object" || input === null) {
+    return { error: "campaign must be an object" };
+  }
+  const c = input as Record<string, unknown>;
+  if (typeof c["id"] !== "string" || !c["id"].trim()) return { error: "campaign.id is required" };
+  if (typeof c["name"] !== "string" || !c["name"].trim()) return { error: "campaign.name is required" };
+
+  const brand = c["brand"];
+  if (typeof brand !== "object" || brand === null) return { error: "campaign.brand is required" };
+  const brandName = (brand as Record<string, unknown>)["name"];
+  if (typeof brandName !== "string" || !brandName.trim()) {
+    return { error: "campaign.brand.name is required" };
+  }
+
+  const prompts = c["prompts"];
+  if (!Array.isArray(prompts) || prompts.length === 0) {
+    return { error: "campaign.prompts must be a non-empty array" };
+  }
+  const normPrompts = [];
+  for (const p of prompts) {
+    if (typeof p === "object" && p !== null && typeof (p as Record<string, unknown>)["prompt"] === "string") {
+      const text = ((p as Record<string, unknown>)["prompt"] as string).trim();
+      if (!text) return { error: "each prompt must have non-empty text" };
+      const weight = (p as Record<string, unknown>)["weight"];
+      normPrompts.push({ prompt: text, weight: typeof weight === "number" ? weight : undefined });
+    } else {
+      return { error: "each prompt must be { prompt: string, weight?: number }" };
+    }
+  }
+
+  const campaign: Campaign = {
+    id: c["id"] as string,
+    name: c["name"] as string,
+    brand: brand as Campaign["brand"],
+    competitors: Array.isArray(c["competitors"]) ? (c["competitors"] as Campaign["competitors"]) : undefined,
+    prompts: normPrompts,
+    engines: Array.isArray(c["engines"]) ? (c["engines"] as string[]) : undefined,
+  };
+  return { campaign };
+}
+
 // ─── App factory ─────────────────────────────────────────────────────────────
 
 /**
@@ -241,7 +322,30 @@ export function createApp(opts: AppOptions = {}) {
   const apiKey = opts.scanApiKey ?? process.env["SCAN_API_KEY"] ?? "";
   const limiter: RateLimiter = opts.rateLimiter ?? new InMemoryRateLimiter();
   const aegis: AegisGuard = opts.aegisGuard ?? createAegisGuard();
+  const store: TrackingStore = opts.store ?? new InMemoryStore();
   const app = new Hono();
+
+  /**
+   * Shared auth + rate-limit gate. Returns a JSON Response to short-circuit
+   * with, or null when the request may proceed. `T` keeps the envelope shape
+   * (ScanResponse | CampaignResponse) honest at the call site.
+   */
+  function gate(
+    c: Context,
+    make: (error: string) => ScanResponse | CampaignResponse,
+  ): Response | null {
+    if (apiKey) {
+      const authHeader = c.req.header("Authorization") ?? "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+      if (!safeCompare(token, apiKey)) return c.json(make("Unauthorized"), 401);
+    }
+    const forwarded = c.req.header("x-forwarded-for") ?? "";
+    const ip = forwarded.split(",")[0]?.trim() || "unknown";
+    if (!limiter.check(ip)) {
+      return c.json(make("Rate limit exceeded. Max 10 requests per minute."), 429);
+    }
+    return null;
+  }
 
   // ── Health check ────────────────────────────────────────────────────────────
   // No auth required — used by Railway healthcheckPath and load balancers.
@@ -348,6 +452,76 @@ export function createApp(opts: AppOptions = {}) {
         500,
       );
     }
+  });
+
+  // ── POST /api/campaign ────────────────────────────────────────────────────
+  // Run a campaign (prompt set × providers), persist the run to the store, and
+  // return the run plus the full history + trend. Same auth + rate-limit gate.
+  const campaignErr = (error: string): CampaignResponse => ({ ok: false, error });
+
+  app.post("/api/campaign", async (c) => {
+    const blocked = gate(c, campaignErr);
+    if (blocked) return blocked;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(campaignErr("Invalid JSON body"), 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json(campaignErr("Request body must be a JSON object"), 400);
+    }
+    const raw = body as Record<string, unknown>;
+
+    // Resolve campaign + providers.
+    let campaign: Campaign;
+    let providerInstances: AnswerEngineProvider[];
+    if (raw["useDemo"] === true && raw["campaign"] === undefined) {
+      campaign = demoCampaign;
+      providerInstances = demoProviders();
+    } else {
+      const validated = validateCampaign(raw["campaign"]);
+      if ("error" in validated) return c.json(campaignErr(validated.error), 400);
+      campaign = validated.campaign;
+
+      // Screen the campaign's free-text inputs before any provider call.
+      const probe = [campaign.brand.name, ...campaign.prompts.map((p) => p.prompt)].join("\n");
+      const aegisResult = await aegis.scan(probe, { scope: "input" });
+      if (!aegisResult.safe) {
+        return c.json(campaignErr(`Input blocked: ${aegisResult.threatType ?? "UNKNOWN_THREAT"}`), 400);
+      }
+
+      const providersField = raw["providers"];
+      const names = Array.isArray(providersField) && providersField.length > 0
+        ? (providersField as string[])
+        : ["mock"];
+      try {
+        providerInstances = buildProviders(names);
+      } catch (err) {
+        return c.json(campaignErr(err instanceof Error ? err.message : String(err)), 400);
+      }
+    }
+
+    try {
+      const run = await runCampaign(campaign, providerInstances);
+      await store.saveCampaign(campaign);
+      await store.recordRun(run);
+      const history = await store.getRuns(campaign.id);
+      return c.json({ ok: true, run, history, trend: computeTrend(history) } satisfies CampaignResponse);
+    } catch (err) {
+      return c.json(campaignErr(err instanceof Error ? err.message : "Campaign run failed"), 500);
+    }
+  });
+
+  // ── GET /api/campaign/:id ─────────────────────────────────────────────────
+  // Read-only history + trend for a persisted campaign.
+  app.get("/api/campaign/:id", async (c) => {
+    const blocked = gate(c, campaignErr);
+    if (blocked) return blocked;
+    const id = c.req.param("id");
+    const history = await store.getRuns(id);
+    return c.json({ ok: true, history, trend: computeTrend(history) } satisfies CampaignResponse);
   });
 
   return app;

@@ -6,7 +6,10 @@ import { MockProvider, type AnswerEngineProvider } from "./providers";
 import { PerplexityProvider } from "./providers/perplexity";
 import { OpenAIProvider } from "./providers/openai";
 import { AnthropicProvider } from "./providers/anthropic";
-import { demoConfig, demoProviders } from "./demo";
+import { runCampaign, type Campaign } from "./campaign";
+import { computeTrend } from "./trends";
+import { openStore, type TrackingStore } from "./store";
+import { demoConfig, demoProviders, demoCampaign } from "./demo";
 import type { TrackingConfig } from "./types";
 
 interface CliArgs {
@@ -29,11 +32,17 @@ Usage:
   gh-ai-rank-tracker --demo --markdown                    Markdown report output
   gh-ai-rank-tracker --demo --json                        JSON report output
 
+Campaigns (tracking over time):
+  gh-ai-rank-tracker campaign run --demo                  Run + persist the demo campaign
+  gh-ai-rank-tracker campaign run --config <campaign.json> [--provider <p>]
+  gh-ai-rank-tracker campaign list                        List stored campaigns + run counts
+  gh-ai-rank-tracker campaign history <campaignId> [--json]   Show the trend over time
+
 Flags:
   --demo                  Use the bundled demo config with scripted engines
-  --config, -c            Path to a JSON TrackingConfig file
+  --config, -c            Path to a JSON TrackingConfig (or Campaign for "campaign run")
   --provider, -p          Engine provider: "mock" (default) | "perplexity" | "openai" | "anthropic"
-  --url, -u               Brand URL for quick analysis (uses demo prompts)
+  --store, -s             Store file path (default: $TRACKER_STORE_PATH or ./.tracker/store.json)
   --markdown, --md        Render a Markdown report
   --json                  Render the raw report object as JSON
   --help, -h              Show this help
@@ -41,7 +50,8 @@ Flags:
 Environment variables:
   PERPLEXITY_API_KEY      Required when --provider perplexity is set
   OPENAI_API_KEY          Required when --provider openai is set
-  ANTHROPIC_API_KEY       Required when --provider anthropic is set`;
+  ANTHROPIC_API_KEY       Required when --provider anthropic is set
+  TRACKER_STORE_PATH      Default campaign store path`;
 
 function parseArgs(argv: string[]): CliArgs {
   const a: CliArgs = {
@@ -64,6 +74,48 @@ function parseArgs(argv: string[]): CliArgs {
   return a;
 }
 
+/** Flags that consume the following argv token as their value. */
+const VALUE_FLAGS = new Set(["--store", "-s", "--config", "-c", "--provider", "-p", "--url", "-u"]);
+
+/** Resolve a `--store`/`-s` path from argv, falling back to the default store. */
+function resolveStore(argv: string[]): TrackingStore {
+  const i = argv.findIndex((a) => a === "--store" || a === "-s");
+  const path = i >= 0 ? argv[i + 1] : undefined;
+  return path ? openStore(path) : openStore();
+}
+
+/** Positional (non-flag) args, skipping the value that follows a value-flag. */
+function positionals(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (VALUE_FLAGS.has(a)) {
+      i++; // skip this flag's value
+      continue;
+    }
+    if (!a.startsWith("-")) out.push(a);
+  }
+  return out;
+}
+
+/** Instantiate live or mock providers from a `--provider` value. */
+function resolveProviders(provider: string): AnswerEngineProvider[] | { error: string } {
+  const live: Record<string, () => AnswerEngineProvider> = {
+    perplexity: () => new PerplexityProvider(),
+    openai: () => new OpenAIProvider(),
+    anthropic: () => new AnthropicProvider(),
+  };
+  if (provider === "mock") return [new MockProvider({ engine: "mock" })];
+  if (provider in live) {
+    try {
+      return [live[provider]!()];
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  return { error: `Unknown --provider "${provider}". Supported: mock, perplexity, openai, anthropic.` };
+}
+
 /** Derive a quick TrackingConfig from a brand URL using the demo prompt set. */
 function buildConfigFromUrl(rawUrl: string): TrackingConfig {
   const parsed = new URL(rawUrl); // throws TypeError on invalid URL
@@ -77,8 +129,149 @@ function buildConfigFromUrl(rawUrl: string): TrackingConfig {
   };
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+// ─── Campaign subcommands ──────────────────────────────────────────────────────
+
+async function campaignRun(argv: string[]): Promise<void> {
+  const args = parseArgs(argv);
+  const store = resolveStore(argv);
+
+  let campaign: Campaign;
+  let providers: AnswerEngineProvider[];
+
+  if (args.demo || (!args.config && !args.url)) {
+    campaign = demoCampaign;
+    providers = demoProviders();
+    if (!args.demo) {
+      console.error("[gh-ai-rank-tracker] No --config given; running the built-in demo campaign.");
+    }
+  } else if (args.config) {
+    campaign = JSON.parse(readFileSync(args.config, "utf8")) as Campaign;
+    const resolved = resolveProviders(args.provider);
+    if ("error" in resolved) {
+      console.error(`[gh-ai-rank-tracker] ${resolved.error}`);
+      process.exitCode = 1;
+      return;
+    }
+    providers = resolved;
+  } else {
+    console.error("[gh-ai-rank-tracker] campaign run needs --demo or --config <campaign.json>.");
+    process.exitCode = 1;
+    return;
+  }
+
+  const run = await runCampaign(campaign, providers);
+  await store.saveCampaign(campaign);
+  await store.recordRun(run);
+  const history = await store.getRuns(campaign.id);
+  const trend = computeTrend(history);
+
+  if (args.json) {
+    console.log(JSON.stringify({ run, trend }, null, 2));
+    return;
+  }
+  if (args.markdown) {
+    console.log(renderMarkdown(run.report));
+    return;
+  }
+  console.log(renderConsole(run.report));
+  console.log("");
+  console.log(
+    `Campaign "${campaign.name}" — run ${run.runId} saved. ${history.length} run(s) recorded.` +
+      (trend.points.length > 1
+        ? ` Visibility ${trend.visibilityDelta >= 0 ? "+" : ""}${trend.visibilityDelta} since first run.`
+        : ""),
+  );
+}
+
+async function campaignList(argv: string[]): Promise<void> {
+  const args = parseArgs(argv);
+  const store = resolveStore(argv);
+  const campaigns = await store.listCampaigns();
+  if (args.json) {
+    const rows = [];
+    for (const c of campaigns) rows.push({ ...c, runs: (await store.getRuns(c.id)).length });
+    console.log(JSON.stringify(rows, null, 2));
+    return;
+  }
+  if (campaigns.length === 0) {
+    console.log("No campaigns stored yet. Run: gh-ai-rank-tracker campaign run --demo");
+    return;
+  }
+  console.log("Stored campaigns:");
+  for (const c of campaigns) {
+    const runs = await store.getRuns(c.id);
+    const latest = runs[runs.length - 1];
+    console.log(
+      `  ${c.id}  —  ${c.name}  (${runs.length} run(s)` +
+        (latest ? `, latest ${latest.visibilityScore}/100 @ ${latest.generatedAt}` : "") +
+        `)`,
+    );
+  }
+}
+
+async function campaignHistory(argv: string[]): Promise<void> {
+  const args = parseArgs(argv);
+  const store = resolveStore(argv);
+  const id = positionals(argv)[0];
+  if (!id) {
+    console.error("[gh-ai-rank-tracker] campaign history needs a <campaignId>.");
+    process.exitCode = 1;
+    return;
+  }
+  const runs = await store.getRuns(id);
+  const trend = computeTrend(runs);
+  if (args.json) {
+    console.log(JSON.stringify(trend, null, 2));
+    return;
+  }
+  if (trend.points.length === 0) {
+    console.log(`No runs recorded for campaign "${id}".`);
+    return;
+  }
+  console.log(`Trend — ${trend.brand} (campaign ${id})`);
+  console.log("");
+  console.log("  Date                      Visibility   SoV");
+  for (const p of trend.points) {
+    console.log(
+      `  ${p.generatedAt}   ${String(p.visibilityScore).padStart(6)}/100   ${String(
+        Math.round(p.shareOfVoice * 100),
+      ).padStart(3)}%`,
+    );
+  }
+  if (trend.points.length > 1) {
+    console.log("");
+    console.log(
+      `  Δ visibility ${trend.visibilityDelta >= 0 ? "+" : ""}${trend.visibilityDelta}` +
+        `   ·   Δ SoV ${trend.shareOfVoiceDelta >= 0 ? "+" : ""}${Math.round(
+          trend.shareOfVoiceDelta * 100,
+        )}%`,
+    );
+  }
+}
+
+async function runCampaignSubcommand(argv: string[]): Promise<void> {
+  const sub = argv[0];
+  const rest = argv.slice(1);
+  switch (sub) {
+    case "run":
+      return campaignRun(rest);
+    case "list":
+      return campaignList(rest);
+    case "history":
+      return campaignHistory(rest);
+    default:
+      console.error(
+        `[gh-ai-rank-tracker] Unknown campaign subcommand "${sub ?? ""}". ` +
+          `Use: run | list | history.`,
+      );
+      process.exitCode = 1;
+  }
+}
+
+// ─── Legacy single-run flow ─────────────────────────────────────────────────────
+
+async function runLegacy(argv: string[]): Promise<void> {
+  const args = parseArgs(argv);
 
   if (args.help) {
     console.log(HELP);
@@ -107,38 +300,20 @@ async function main(): Promise<void> {
   }
 
   // ── Providers ───────────────────────────────────────────────────────────────
-  // Live adapters read their API key from the environment and throw if it's
-  // missing; the MockProvider is the no-key default.
-  const liveProviders: Record<string, () => AnswerEngineProvider> = {
-    perplexity: () => new PerplexityProvider(),
-    openai: () => new OpenAIProvider(),
-    anthropic: () => new AnthropicProvider(),
-  };
-
   let providers: AnswerEngineProvider[];
-  if (args.provider in liveProviders) {
-    try {
-      providers = [liveProviders[args.provider]!()];
-    } catch (err) {
-      console.error(
-        `[gh-ai-rank-tracker] ${err instanceof Error ? err.message : String(err)}`,
-      );
+  if (args.provider !== "mock" || args.config || args.url) {
+    const resolved = resolveProviders(args.provider);
+    if ("error" in resolved) {
+      console.error(`[gh-ai-rank-tracker] ${resolved.error}`);
       process.exitCode = 1;
       return;
     }
-  } else if (args.provider !== "mock") {
-    console.error(
-      `[gh-ai-rank-tracker] Unknown --provider "${args.provider}". ` +
-        `Supported: mock, perplexity, openai, anthropic.`,
-    );
-    process.exitCode = 1;
-    return;
-  } else if (args.config || args.url) {
-    // Custom config / URL mode with the default mock provider
-    providers = [new MockProvider({ engine: "mock" })];
-    console.error(
-      "[gh-ai-rank-tracker] Using MockProvider. Pass --provider perplexity|openai|anthropic for live queries.",
-    );
+    providers = resolved;
+    if (args.provider === "mock" && (args.config || args.url)) {
+      console.error(
+        "[gh-ai-rank-tracker] Using MockProvider. Pass --provider perplexity|openai|anthropic for live queries.",
+      );
+    }
   } else {
     // Demo mode — use the scripted demo providers
     providers = demoProviders();
@@ -149,6 +324,14 @@ async function main(): Promise<void> {
   if (args.json) console.log(JSON.stringify(report, null, 2));
   else if (args.markdown) console.log(renderMarkdown(report));
   else console.log(renderConsole(report));
+}
+
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  if (argv[0] === "campaign") {
+    return runCampaignSubcommand(argv.slice(1));
+  }
+  return runLegacy(argv);
 }
 
 main().catch((err) => {

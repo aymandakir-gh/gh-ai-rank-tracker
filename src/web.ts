@@ -13,4 +13,18 @@ export * from "./detect";
 export * from "./score";
 export * from "./providers";
 export * from "./tracker";
-export { demoConfig, demoProviders } from "./demo";
+export * from "./report";
+export * from "./campaign";
+export * from "./trends";
+export {
+  demoConfig,
+  demoProviders,
+  demoCampaign,
+  demoProvidersForWeek,
+  demoCampaignHistory,
+} from "./demo";
+
+// NOTE: ./store (JsonFileStore) is intentionally NOT re-exported here — it
+// imports node:fs and must only be used from server code. Import it directly
+// from "../src/store" in a Next.js route/server module when persistence is
+// needed; never from a client component.

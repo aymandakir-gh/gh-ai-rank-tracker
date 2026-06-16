@@ -1,57 +1,49 @@
-# STATUS — v0.4.0 ✅
+# STATUS
 
-Live answer-engine adapters shipped. See [PLAN.md](PLAN.md) for the original gap
-analysis. Newest entries at the top.
+Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
+v0.4.0 history is in [PLAN.md](PLAN.md).
 
-## Release: v0.4.0
-- **Goal met.** Live OpenAI + Perplexity + Anthropic adapters behind env keys,
-  MockProvider kept as the no-key default; skip-without-keys integration tests;
-  obs/sentry-posthog branch merged; all open issues + PRs resolved; CI green on
-  main; README env setup + demo-recording step. Version bumped to 0.4.0 and
-  tagged.
-- **Tests:** engine 208 passing + 3 live-integration skipped (no keys); web 118
-  passing + `next build` green.
-- **Runtime verified:** `node dist/src/cli.js --demo` and `node dist/src/server.js`
-  (CommonJS dist) both run end-to-end against MockProvider.
+## Release: v0.5.0 ✅ — Tracking, campaigns & competitor SoV
 
-## What shipped
-- **Adapters** (`src/providers/`): `OpenAIProvider` (Responses API + web_search),
-  `AnthropicProvider` (Messages API + web_search_20260209), `PerplexityProvider`
-  (default model → `sonar`). Shared `http.ts#withRetry` (exponential backoff, no
-  retry on 4xx, retry only the network call). Web-search citations; defensive
-  parsing. Models overridable via `*_MODEL` env vars. Wired into `buildProviders`
-  (Hono API), the CLI `--provider`, and `index.ts`.
-- **Tests:** fixture-based unit tests (zero network) + `describe.skipIf(!key)`
-  integration tests in `tests/providers.integration.test.ts`.
-- **Build:** CommonJS `dist` (`tsconfig.build.json` + `dist/package.json` marker)
-  so `npm start` / the bin run; `exports` map + `src` dropped from the tarball.
-- **Merges:** w4 (rate-limiter prune), obs-2 (Sentry+PostHog), w5 html-lang
-  (LangSync), w5 contrast (a11y).
-- **CI:** `.github/workflows/ci.yml` — engine (typecheck/build/test) + web
-  (typecheck/build/test). Green on main.
-- **Docs:** README live-provider env setup, one-line run, vhs/asciinema
-  demo-recording step; root `.env.example`.
+- **Goal met (items 1–3, CLI/API).** A local-first persisted store, multi-prompt
+  campaigns, share-of-voice aggregated across prompts × engines, and a
+  head-to-head competitor comparison — all surfaced in the CLI and the API.
+- **Tests:** engine **248 passing + 3 skipped** (was 208), web **118 passing**.
+  Typecheck, CommonJS build, and `next build` all green.
+- **Runtime verified (dist build):** `campaign run/list/history` persist to a
+  real JSON file across invocations; booted `server.js` runs + persists campaign
+  runs over `POST /api/campaign` and serves `GET /api/campaign/:id` history+trend.
 
-## Issue / PR disposition
-- **#2 OBS-2** — closed; shipped via #1 (Sentry + PostHog, graceful-degrade).
-- **#4 locale zh vs zh-cn** — closed verified-correct (`i18n.ts` keys `zh`;
-  LangSync matches; misleading docstring fixed).
-- **PRs #1/#3/#5/#7** — merged. **PR #6** — closed (superseded by #5). All
-  merged/superseded remote branches deleted; only `main` remains.
+### What shipped
+- **`src/store.ts`** — `TrackingStore` interface; `InMemoryStore`; `JsonFileStore`
+  (lazy load, atomic temp-file→rename write, version-stamped JSON, empty-on-ENOENT).
+  `defaultStorePath()` (`$TRACKER_STORE_PATH` → `./.tracker/store.json`),
+  `openStore()`.
+- **`src/campaign.ts`** — `Campaign`, `CampaignRun`, `EngineBreakdownEntry`,
+  `CompetitorComparisonEntry`; `runCampaign()` (wraps `runTracking`, injectable
+  `now`/`idFactory`), `engineBreakdown()`, `competitorComparison()` (SoV gap vs
+  the tracked brand).
+- **`src/trends.ts`** — `computeTrend()` → ordered `TrendPoint[]` (visibility +
+  per-brand SoV + per-engine score) with first→last deltas. Pure, fixture-tested.
+- **`src/demo.ts`** — `demoCampaign` + `demoProvidersForWeek()` +
+  `demoCampaignHistory()` (deterministic 4-week rising-visibility sample, all
+  scored by the real engine).
+- **CLI** — `campaign run|list|history` subcommands (legacy flags untouched);
+  `--store`/`-s`, `--json`, `--markdown`.
+- **API** — `POST /api/campaign` (run + persist + return run/history/trend) and
+  `GET /api/campaign/:id`; shared auth + rate-limit gate; Aegis screens campaign
+  prompt text. `server.ts` injects a `JsonFileStore`.
+- **Wiring** — exported via `index.ts` (+ API types) and `web.ts` (store kept
+  server-only). `.env.example` + `.gitignore` updated for the store.
 
-## Review
-- A multi-agent adversarial review confirmed 5 findings before tagging; all
-  fixed (retry/parse separation + defensive parsing; Anthropic search-error
-  fallback; packaging exports/tarball; web `next build` in CI; dead
-  `next.config.ts` removed + source-map guard ported). Re-verified green.
+### Tests added
+- `tests/campaign.test.ts` (8), `tests/store.test.ts` (shared contract ×2 +
+  file-specific), `tests/trends.test.ts` (5), `tests/api.campaign.test.ts` (15).
 
-## Checklist
-- [x] 1. PLAN.md + STATUS.md
-- [x] 2. Test-infra repair (both suites green)
-- [x] 3. OpenAI + Anthropic adapters wired (CLI, API, index)
-- [x] 4. Unit (fixture) + integration (skip-without-key) tests
-- [x] 5. Merge w4 / obs-2 / w5 html-lang / w5 contrast; PRs closed; branches deleted
-- [x] 6. Close issues #2 and #4
-- [x] 7. CI workflow green on main
-- [x] 8. README env setup + demo-recording step
-- [x] 9. Adversarial review → fixes → tag v0.4.0
+## Next
+- v0.6.0 — Google Gemini adapter (4th engine).
+- v0.7.0 — Web dashboard: SoV trend chart, per-engine breakdown, competitor
+  comparison, per-prompt drill-down (i18n).
+- v0.8.0 — Exportable campaign report (Markdown + PDF).
+- v0.9.0 — Methodology doc + launch README + vhs demo.
+- v1.0.0 — Adversarial review → fixes → regression tests → release.
