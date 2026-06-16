@@ -24,6 +24,7 @@ import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
 import { OpenAIProvider } from "../providers/openai";
 import { AnthropicProvider } from "../providers/anthropic";
+import { GeminiProvider } from "../providers/gemini";
 import type { TrackingReport, TrackingConfig } from "../types";
 import { runCampaign, type Campaign, type CampaignRun } from "../campaign";
 import { computeTrend, type Trend } from "../trends";
@@ -31,7 +32,7 @@ import { InMemoryStore, type TrackingStore } from "../store";
 import { demoConfig, demoCampaign, demoProviders } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
 
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export interface ScanRequest {
   url: string;
   /**
    * Provider names to query in parallel.
-   * Supported: "mock" | "perplexity" | "openai" | "anthropic".
+   * Supported: "mock" | "perplexity" | "openai" | "anthropic" | "gemini".
    * Defaults to ["mock"] when omitted.
    */
   providers?: string[];
@@ -256,9 +257,11 @@ export function buildProviders(names: string[]): AnswerEngineProvider[] {
         return new OpenAIProvider(); // throws if OPENAI_API_KEY missing
       case "anthropic":
         return new AnthropicProvider(); // throws if ANTHROPIC_API_KEY missing
+      case "gemini":
+        return new GeminiProvider(); // throws if GEMINI_API_KEY/GOOGLE_API_KEY missing
       default:
         throw new Error(
-          `Unknown provider: "${name}". Supported values: "mock", "perplexity", "openai", "anthropic".`,
+          `Unknown provider: "${name}". Supported values: "mock", "perplexity", "openai", "anthropic", "gemini".`,
         );
     }
   });

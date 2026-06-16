@@ -27,6 +27,8 @@ export { OpenAIProvider, OpenAIApiError } from "./providers/openai";
 export type { OpenAIOptions } from "./providers/openai";
 export { AnthropicProvider, AnthropicApiError } from "./providers/anthropic";
 export type { AnthropicOptions } from "./providers/anthropic";
+export { GeminiProvider, GeminiApiError } from "./providers/gemini";
+export type { GeminiOptions } from "./providers/gemini";
 
 // ─── API layer ────────────────────────────────────────────────────────────────
 export {

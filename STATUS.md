@@ -3,6 +3,22 @@
 Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
 v0.4.0 history is in [PLAN.md](PLAN.md).
 
+## Release: v0.6.0 ✅ — Google Gemini adapter (4th engine)
+
+- **Goal met (item 4).** `GeminiProvider` (generateContent + `google_search`
+  grounding) mirrors the existing adapter contract: injectable `fetch`,
+  `withRetry` (5xx/network retry, 4xx no-retry), typed `GeminiApiError`,
+  defensive parsing, env-key gated (`GEMINI_API_KEY` → `GOOGLE_API_KEY`).
+- **Citations:** grounding chunks → `{ url, title }`; a domain-shaped grounding
+  `title` maps to `https://<domain>` so brand-domain citation detection works,
+  falling back to the raw redirect URL otherwise.
+- **Wired:** CLI `--provider gemini`, API `buildProviders` (scan + campaign),
+  `index.ts` exports, `.env.example`, README provider table + roadmap.
+- **Tests:** +18 fixture units (`tests/providers.gemini.test.ts`) + a
+  `skipIf(!GEMINI_API_KEY)` live integration test → engine **266 passing +
+  4 skipped**; web **118 passing**. Typecheck + both builds green. CLI no-key
+  error path verified against the dist build.
+
 ## Release: v0.5.0 ✅ — Tracking, campaigns & competitor SoV
 
 - **Goal met (items 1–3, CLI/API).** A local-first persisted store, multi-prompt

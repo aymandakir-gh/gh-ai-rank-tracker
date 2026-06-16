@@ -8,6 +8,7 @@
  *   OPENAI_API_KEY=sk-...     npx vitest run tests/providers.integration.test.ts
  *   ANTHROPIC_API_KEY=sk-...  npx vitest run tests/providers.integration.test.ts
  *   PERPLEXITY_API_KEY=pplx-... npx vitest run tests/providers.integration.test.ts
+ *   GEMINI_API_KEY=...        npx vitest run tests/providers.integration.test.ts
  *
  * They assert only the provider contract (non-empty text, citations array,
  * echoed engine/prompt) — not specific content, which is non-deterministic.
@@ -17,6 +18,7 @@ import type { AnswerEngineProvider } from "../src/providers";
 import { PerplexityProvider } from "../src/providers/perplexity";
 import { OpenAIProvider } from "../src/providers/openai";
 import { AnthropicProvider } from "../src/providers/anthropic";
+import { GeminiProvider } from "../src/providers/gemini";
 
 const PROMPT = "What is generative engine optimization (GEO)? Name a couple of tools.";
 const TIMEOUT_MS = 90_000;
@@ -48,3 +50,4 @@ function liveSuite(engine: string, envVar: string, make: () => AnswerEngineProvi
 liveSuite("perplexity", "PERPLEXITY_API_KEY", () => new PerplexityProvider());
 liveSuite("openai", "OPENAI_API_KEY", () => new OpenAIProvider());
 liveSuite("anthropic", "ANTHROPIC_API_KEY", () => new AnthropicProvider());
+liveSuite("gemini", "GEMINI_API_KEY", () => new GeminiProvider());

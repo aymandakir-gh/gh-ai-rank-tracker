@@ -30,7 +30,7 @@ This tool turns those questions into a single, repeatable **AI Visibility Score 
 - **Share of voice** — benchmark presence and mention volume against any set of competitors.
 - **Coverage + gaps** — see exactly which prompts return zero mentions of you.
 - **Recommendations** — prioritized, rule-based next steps (high / medium / low).
-- **Live answer engines** — first-class adapters for **OpenAI**, **Perplexity** and **Anthropic** (Claude), all behind your own API keys and all implementing one `AnswerEngineProvider` interface. The deterministic `MockProvider` is the no-key default, so the whole engine still runs offline and is fully unit-tested.
+- **Live answer engines** — first-class adapters for **OpenAI**, **Perplexity**, **Anthropic** (Claude) and **Google Gemini**, all behind your own API keys and all implementing one `AnswerEngineProvider` interface. The deterministic `MockProvider` is the no-key default, so the whole engine still runs offline and is fully unit-tested.
 - **Reports** — console, Markdown, or raw JSON.
 
 ## Install
@@ -108,9 +108,9 @@ export interface AnswerEngineProvider {
 }
 ```
 
-v0.4 ships three **live** adapters alongside the offline `MockProvider`. Each
-reads its key from the environment only (never committed) and uses the
-provider's web-search capability so answers come back with real source
+Four **live** adapters ship alongside the offline `MockProvider`. Each reads its
+key from the environment only (never committed) and uses the provider's
+web-search / grounding capability so answers come back with real source
 citations:
 
 | Provider | `--provider` value | Env var | Model override | Default model |
@@ -119,6 +119,12 @@ citations:
 | OpenAI | `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-4o` |
 | Perplexity | `perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_MODEL` | `sonar` |
 | Anthropic (Claude) | `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` |
+| Google Gemini | `gemini` | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | `GEMINI_MODEL` | `gemini-2.0-flash` |
+
+> **Gemini grounding note:** Gemini returns sources as grounding-redirect links
+> with the source domain in the `title`. The adapter maps a domain-shaped title
+> to `https://<domain>` so brand-domain citation detection works, falling back
+> to the raw redirect URL otherwise.
 
 ### Setup
 
@@ -202,7 +208,7 @@ Request body:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `url` | string | ✅ | Brand URL — name + domain inferred automatically |
-| `providers` | string[] | ❌ | any of `"mock"`, `"perplexity"`, `"openai"`, `"anthropic"` (default: `["mock"]`). Live providers require the matching API key in the server env. |
+| `providers` | string[] | ❌ | any of `"mock"`, `"perplexity"`, `"openai"`, `"anthropic"`, `"gemini"` (default: `["mock"]`). Live providers require the matching API key in the server env. |
 
 ## Deploy
 
@@ -249,11 +255,12 @@ SCAN_API_URL=http://localhost:3000 npm run dev
 - [x] Core scoring engine (mention + citation + share of voice + gaps)
 - [x] REST API (Hono, Bearer auth, rate limiting)
 - [x] Web UI (Next.js, i18n 9 languages, a11y)
-- [x] Live provider adapters — OpenAI, Perplexity, Anthropic (Claude)
+- [x] Live provider adapters — OpenAI, Perplexity, Anthropic (Claude), Google Gemini
 - [x] Email gate + lead capture (web)
 - [x] Observability — Sentry + PostHog on the web app (graceful-degrade)
-- [ ] More engines — Gemini, Google AI Overviews
-- [ ] Scheduled runs + historical trend tracking
+- [x] Campaigns + local-first persisted store + historical trend tracking
+- [x] Competitor share-of-voice benchmarking (CLI + API)
+- [ ] Google AI Overviews adapter
 
 ## Built by GrowthHackers
 

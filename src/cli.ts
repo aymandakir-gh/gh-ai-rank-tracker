@@ -6,6 +6,7 @@ import { MockProvider, type AnswerEngineProvider } from "./providers";
 import { PerplexityProvider } from "./providers/perplexity";
 import { OpenAIProvider } from "./providers/openai";
 import { AnthropicProvider } from "./providers/anthropic";
+import { GeminiProvider } from "./providers/gemini";
 import { runCampaign, type Campaign } from "./campaign";
 import { computeTrend } from "./trends";
 import { openStore, type TrackingStore } from "./store";
@@ -41,7 +42,7 @@ Campaigns (tracking over time):
 Flags:
   --demo                  Use the bundled demo config with scripted engines
   --config, -c            Path to a JSON TrackingConfig (or Campaign for "campaign run")
-  --provider, -p          Engine provider: "mock" (default) | "perplexity" | "openai" | "anthropic"
+  --provider, -p          Engine provider: "mock" (default) | "perplexity" | "openai" | "anthropic" | "gemini"
   --store, -s             Store file path (default: $TRACKER_STORE_PATH or ./.tracker/store.json)
   --markdown, --md        Render a Markdown report
   --json                  Render the raw report object as JSON
@@ -104,6 +105,7 @@ function resolveProviders(provider: string): AnswerEngineProvider[] | { error: s
     perplexity: () => new PerplexityProvider(),
     openai: () => new OpenAIProvider(),
     anthropic: () => new AnthropicProvider(),
+    gemini: () => new GeminiProvider(),
   };
   if (provider === "mock") return [new MockProvider({ engine: "mock" })];
   if (provider in live) {
@@ -113,7 +115,9 @@ function resolveProviders(provider: string): AnswerEngineProvider[] | { error: s
       return { error: err instanceof Error ? err.message : String(err) };
     }
   }
-  return { error: `Unknown --provider "${provider}". Supported: mock, perplexity, openai, anthropic.` };
+  return {
+    error: `Unknown --provider "${provider}". Supported: mock, perplexity, openai, anthropic, gemini.`,
+  };
 }
 
 /** Derive a quick TrackingConfig from a brand URL using the demo prompt set. */

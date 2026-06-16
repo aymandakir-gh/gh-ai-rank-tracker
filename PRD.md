@@ -94,12 +94,14 @@ prompt *set* (campaign), a *persisted history*, *competitor* benchmarking, more
 `extractTextAndCitations`), wired into CLI `--provider gemini`, API
 `buildProviders`, `index.ts`/`web.ts`. `.env.example` + README updated.
 
-**Definition of Done**
-- [ ] Fixture unit tests: text + grounding-citation extraction, dedupe, empty/
-      malformed-200 (no throw, no retry), 4xx no-retry, 5xx retry/backoff,
-      request shape (key, model, `google_search` tool), env-key requirement.
-- [ ] `skipIf(!GEMINI_API_KEY)` integration test added to the live suite.
-- [ ] Selectable from CLI + API + library; build/typecheck/tests green.
+**Definition of Done** — ✅ shipped (tag v0.6.0)
+- [x] Fixture unit tests (18): text + grounding-citation extraction, domain-title
+      mapping + uri fallback, dedupe, empty/malformed-200 (no throw, no retry),
+      4xx no-retry, 5xx retry/backoff, request shape (key, model, `google_search`
+      tool), env-key requirement (GEMINI → GOOGLE fallback).
+- [x] `skipIf(!GEMINI_API_KEY)` integration test added to the live suite.
+- [x] Selectable from CLI (`--provider gemini`) + API (`buildProviders`) +
+      library; build/typecheck/tests green.
 
 ## M3 — v0.7.0 · Web dashboard upgrade
 
