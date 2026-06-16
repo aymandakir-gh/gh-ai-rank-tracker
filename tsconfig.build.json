@@ -1,0 +1,17 @@
+{
+  // Build config for the runnable dist/ artifact.
+  //
+  // The package source uses extensionless relative imports (`./tracker`). The
+  // editor/typecheck config (tsconfig.json) resolves those with "Bundler", but
+  // Node's ESM loader requires explicit extensions — so an ESM emit would fail
+  // at runtime (`npm start`, the bin). Emitting CommonJS instead lets Node
+  // resolve the extensionless requires; a dist/package.json marking dist as
+  // commonjs is written by the build script so Node treats the .js files as CJS
+  // even though the repo root is "type": "module".
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10"
+  },
+  "include": ["src/**/*.ts"]
+}

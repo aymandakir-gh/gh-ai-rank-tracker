@@ -14,6 +14,10 @@ export * from "./report";
 export { demoConfig, demoProviders } from "./demo";
 export { PerplexityProvider, PerplexityApiError } from "./providers/perplexity";
 export type { PerplexityOptions } from "./providers/perplexity";
+export { OpenAIProvider, OpenAIApiError } from "./providers/openai";
+export type { OpenAIOptions } from "./providers/openai";
+export { AnthropicProvider, AnthropicApiError } from "./providers/anthropic";
+export type { AnthropicOptions } from "./providers/anthropic";
 
 // ─── API layer ────────────────────────────────────────────────────────────────
 export { createApp, buildConfigFromUrl, buildProviders, InMemoryRateLimiter } from "./api/scan";

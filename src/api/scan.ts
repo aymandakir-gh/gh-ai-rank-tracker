@@ -22,6 +22,8 @@ import { Hono } from "hono";
 import { runTracking } from "../tracker";
 import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
+import { OpenAIProvider } from "../providers/openai";
+import { AnthropicProvider } from "../providers/anthropic";
 import type { TrackingReport, TrackingConfig } from "../types";
 import { demoConfig } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
@@ -66,7 +68,7 @@ export interface ScanRequest {
   url: string;
   /**
    * Provider names to query in parallel.
-   * Supported: "mock" | "perplexity".
+   * Supported: "mock" | "perplexity" | "openai" | "anthropic".
    * Defaults to ["mock"] when omitted.
    */
   providers?: string[];
@@ -166,9 +168,13 @@ export function buildProviders(names: string[]): AnswerEngineProvider[] {
         return new MockProvider({ engine: "mock" });
       case "perplexity":
         return new PerplexityProvider(); // throws if PERPLEXITY_API_KEY missing
+      case "openai":
+        return new OpenAIProvider(); // throws if OPENAI_API_KEY missing
+      case "anthropic":
+        return new AnthropicProvider(); // throws if ANTHROPIC_API_KEY missing
       default:
         throw new Error(
-          `Unknown provider: "${name}". Supported values: "mock", "perplexity".`,
+          `Unknown provider: "${name}". Supported values: "mock", "perplexity", "openai", "anthropic".`,
         );
     }
   });

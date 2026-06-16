@@ -4,6 +4,8 @@ import { runTracking } from "./tracker";
 import { renderConsole, renderMarkdown } from "./report";
 import { MockProvider, type AnswerEngineProvider } from "./providers";
 import { PerplexityProvider } from "./providers/perplexity";
+import { OpenAIProvider } from "./providers/openai";
+import { AnthropicProvider } from "./providers/anthropic";
 import { demoConfig, demoProviders } from "./demo";
 import type { TrackingConfig } from "./types";
 
@@ -23,20 +25,23 @@ Usage:
   gh-ai-rank-tracker --demo                               Run the built-in demo (no setup)
   gh-ai-rank-tracker --config <file.json>                 Run with your own TrackingConfig
   gh-ai-rank-tracker --provider perplexity --url <url>    Live analysis with Perplexity
+  gh-ai-rank-tracker --provider openai --url <url>        Live analysis with OpenAI
   gh-ai-rank-tracker --demo --markdown                    Markdown report output
   gh-ai-rank-tracker --demo --json                        JSON report output
 
 Flags:
   --demo                  Use the bundled demo config with scripted engines
   --config, -c            Path to a JSON TrackingConfig file
-  --provider, -p          Engine provider: "mock" (default) | "perplexity"
+  --provider, -p          Engine provider: "mock" (default) | "perplexity" | "openai" | "anthropic"
   --url, -u               Brand URL for quick analysis (uses demo prompts)
   --markdown, --md        Render a Markdown report
   --json                  Render the raw report object as JSON
   --help, -h              Show this help
 
 Environment variables:
-  PERPLEXITY_API_KEY      Required when --provider perplexity is set`;
+  PERPLEXITY_API_KEY      Required when --provider perplexity is set
+  OPENAI_API_KEY          Required when --provider openai is set
+  ANTHROPIC_API_KEY       Required when --provider anthropic is set`;
 
 function parseArgs(argv: string[]): CliArgs {
   const a: CliArgs = {
@@ -102,10 +107,18 @@ async function main(): Promise<void> {
   }
 
   // ── Providers ───────────────────────────────────────────────────────────────
+  // Live adapters read their API key from the environment and throw if it's
+  // missing; the MockProvider is the no-key default.
+  const liveProviders: Record<string, () => AnswerEngineProvider> = {
+    perplexity: () => new PerplexityProvider(),
+    openai: () => new OpenAIProvider(),
+    anthropic: () => new AnthropicProvider(),
+  };
+
   let providers: AnswerEngineProvider[];
-  if (args.provider === "perplexity") {
+  if (args.provider in liveProviders) {
     try {
-      providers = [new PerplexityProvider()];
+      providers = [liveProviders[args.provider]!()];
     } catch (err) {
       console.error(
         `[gh-ai-rank-tracker] ${err instanceof Error ? err.message : String(err)}`,
@@ -113,11 +126,18 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
+  } else if (args.provider !== "mock") {
+    console.error(
+      `[gh-ai-rank-tracker] Unknown --provider "${args.provider}". ` +
+        `Supported: mock, perplexity, openai, anthropic.`,
+    );
+    process.exitCode = 1;
+    return;
   } else if (args.config || args.url) {
     // Custom config / URL mode with the default mock provider
     providers = [new MockProvider({ engine: "mock" })];
     console.error(
-      "[gh-ai-rank-tracker] Using MockProvider. Pass --provider perplexity for live queries.",
+      "[gh-ai-rank-tracker] Using MockProvider. Pass --provider perplexity|openai|anthropic for live queries.",
     );
   } else {
     // Demo mode — use the scripted demo providers

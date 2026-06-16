@@ -1,5 +1,6 @@
 import type { AnswerEngineProvider } from "../providers";
 import type { Citation, EngineResponse } from "../types";
+import { withRetry } from "./http";
 
 export interface PerplexityOptions {
   /** Perplexity API key. Defaults to process.env.PERPLEXITY_API_KEY. */
@@ -45,10 +46,6 @@ interface PerplexityResponseBody {
 
 const API_URL = "https://api.perplexity.ai/chat/completions";
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /**
  * HTTP error from the Perplexity API, carrying the status code so callers
  * can decide whether to retry (5xx) or propagate immediately (4xx).
@@ -91,32 +88,17 @@ export class PerplexityProvider implements AnswerEngineProvider {
       );
     }
     this.apiKey = key;
-    this.model = opts.model ?? "llama-3.1-sonar-large-128k-online";
+    this.model = opts.model ?? process.env.PERPLEXITY_MODEL ?? "sonar";
     this.maxRetries = opts.maxRetries ?? 3;
     this.baseDelayMs = opts.baseDelayMs ?? 1000;
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 
   async query(prompt: string): Promise<EngineResponse> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      if (attempt > 0) {
-        await sleep(this.baseDelayMs * Math.pow(2, attempt - 1));
-      }
-      try {
-        const raw = await this.callApi(prompt);
-        return this.parseResponse(prompt, raw);
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        // Client errors (4xx) are deterministic — retrying will not help.
-        if (err instanceof PerplexityApiError && err.status >= 400 && err.status < 500) {
-          throw err;
-        }
-      }
-    }
-
-    throw lastError ?? new Error("PerplexityProvider: max retries exhausted");
+    return withRetry(async () => this.parseResponse(prompt, await this.callApi(prompt)), {
+      maxRetries: this.maxRetries,
+      baseDelayMs: this.baseDelayMs,
+    });
   }
 
   private async callApi(prompt: string): Promise<PerplexityResponseBody> {
