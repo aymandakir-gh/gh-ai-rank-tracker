@@ -227,4 +227,15 @@ describe("OpenAIProvider — retry + errors", () => {
     await expect(p.query("p")).rejects.toBeInstanceOf(OpenAIApiError);
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
+
+  it("does NOT retry a malformed but HTTP-200 payload — parsing is deterministic", async () => {
+    // Wrong-typed `output` → defensive parser yields an empty result, and the
+    // single successful fetch is not retried (parse is outside the retry loop).
+    const mockFetch = makeFetch({ id: "x", output: 5 });
+    const p = new OpenAIProvider({ apiKey: "k", fetch: mockFetch as unknown as typeof fetch, baseDelayMs: 0 });
+    const res = await p.query("p");
+    expect(res.text).toBe("");
+    expect(res.citations).toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });

@@ -67,6 +67,23 @@ const FIXTURE_TEXT_ONLY = {
   content: [{ type: "text", text: "A direct answer with no sources." }],
 };
 
+// A failed web search: the API returns HTTP 200 with `content` as an ERROR
+// OBJECT (not an array) — e.g. max_uses_exceeded / too_many_requests.
+const FIXTURE_SEARCH_ERROR = {
+  id: "msg_test_004",
+  model: "claude-sonnet-4-6",
+  role: "assistant",
+  type: "message",
+  content: [
+    {
+      type: "web_search_tool_result",
+      tool_use_id: "srvtoolu_3",
+      content: { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" },
+    },
+    { type: "text", text: "I couldn't complete the search, but here's what I know." },
+  ],
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeFetch(body: unknown, status = 200) {
@@ -134,6 +151,24 @@ describe("AnthropicProvider — query() parsing", () => {
     const res = await p.query("p");
     expect(res.text).toContain("direct answer");
     expect(res.citations).toEqual([]);
+  });
+
+  it("degrades to empty citations (no throw) when a web search returns an error block", async () => {
+    const p = new AnthropicProvider({ apiKey: "k", fetch: makeFetch(FIXTURE_SEARCH_ERROR) as unknown as typeof fetch });
+    const res = await p.query("p");
+    expect(res.text).toContain("couldn't complete");
+    expect(res.citations).toEqual([]);
+  });
+
+  it("does NOT retry a malformed but HTTP-200 payload — parsing is deterministic", async () => {
+    // Wrong-typed `content` → defensive parser yields an empty result, and the
+    // single successful fetch is not retried (parse is outside the retry loop).
+    const mockFetch = makeFetch({ id: "x", content: 5 });
+    const p = new AnthropicProvider({ apiKey: "k", fetch: mockFetch as unknown as typeof fetch, baseDelayMs: 0 });
+    const res = await p.query("p");
+    expect(res.text).toBe("");
+    expect(res.citations).toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("attaches the raw payload and echoes engine + prompt", async () => {

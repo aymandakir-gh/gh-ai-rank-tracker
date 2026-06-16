@@ -127,10 +127,13 @@ export class AnthropicProvider implements AnswerEngineProvider {
   }
 
   async query(prompt: string): Promise<EngineResponse> {
-    return withRetry(async () => this.parseResponse(prompt, await this.callApi(prompt)), {
+    // Retry only the network call. Parsing is deterministic — a malformed but
+    // HTTP-200 payload must not be retried as if it were a transient failure.
+    const raw = await withRetry(() => this.callApi(prompt), {
       maxRetries: this.maxRetries,
       baseDelayMs: this.baseDelayMs,
     });
+    return this.parseResponse(prompt, raw);
   }
 
   private async callApi(prompt: string): Promise<AnthropicResponseBody> {
@@ -184,7 +187,9 @@ export function extractTextAndCitations(raw: AnthropicResponseBody): {
   text: string;
   citations: Citation[];
 } {
-  const blocks = raw.content ?? [];
+  // Defensive against wrong-typed fields on an HTTP-200 payload — a malformed
+  // body should yield an empty result, never throw (parsing is not retried).
+  const blocks = Array.isArray(raw.content) ? raw.content : [];
   let text = "";
   const citations: Citation[] = [];
   const seen = new Set<string>();
@@ -198,15 +203,19 @@ export function extractTextAndCitations(raw: AnthropicResponseBody): {
   for (const block of blocks) {
     if (block.type === "text") {
       if (typeof block.text === "string") text += block.text;
-      for (const c of block.citations ?? []) add(c.url, c.title);
+      const cits = Array.isArray(block.citations) ? block.citations : [];
+      for (const c of cits) add(c.url, c.title);
     }
   }
 
   // Fall back to the raw search results when the model didn't inline citations.
+  // On a failed search the API returns `content` as an error OBJECT (HTTP 200,
+  // e.g. { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" }),
+  // not an array — so guard with Array.isArray before iterating.
   if (citations.length === 0) {
     for (const block of blocks) {
-      if (block.type === "web_search_tool_result") {
-        for (const r of block.content ?? []) add(r.url, r.title);
+      if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+        for (const r of block.content) add(r.url, r.title);
       }
     }
   }

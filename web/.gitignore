@@ -1,0 +1,12 @@
+# Next.js build output
+/.next/
+/out/
+
+# Next.js generated types
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Misc
+*.tsbuildinfo

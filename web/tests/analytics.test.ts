@@ -97,16 +97,18 @@ describe('OBS-2 env.example completeness', () => {
   });
 });
 
-// ── next.config.ts wraps with withSentryConfig ────────────────────────────────
+// ── next.config.mjs wraps with withSentryConfig ───────────────────────────────
+// Next.js loads next.config.mjs (not .ts); the Sentry wrapper + source-map guard
+// live there. See issue #5 / the v0.4.0 release review.
 
-describe('OBS-2 next.config.ts', () => {
+describe('OBS-2 next.config.mjs', () => {
   it('uses withSentryConfig wrapper', () => {
-    const nextConf = readSrc('next.config.ts');
+    const nextConf = readSrc('next.config.mjs');
     expect(nextConf).toContain('withSentryConfig');
   });
 
   it('disables source maps when SENTRY_AUTH_TOKEN is absent', () => {
-    const nextConf = readSrc('next.config.ts');
+    const nextConf = readSrc('next.config.mjs');
     expect(nextConf).toContain('SENTRY_AUTH_TOKEN');
   });
 });

@@ -25,9 +25,19 @@
   },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./web": {
+      "types": "./dist/src/web.d.ts",
+      "default": "./dist/src/web.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist",
-    "src",
     "README.md",
     "LICENSE"
   ],

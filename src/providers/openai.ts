@@ -113,10 +113,13 @@ export class OpenAIProvider implements AnswerEngineProvider {
   }
 
   async query(prompt: string): Promise<EngineResponse> {
-    return withRetry(async () => this.parseResponse(prompt, await this.callApi(prompt)), {
+    // Retry only the network call. Parsing is deterministic — a malformed but
+    // HTTP-200 payload must not be retried as if it were a transient failure.
+    const raw = await withRetry(() => this.callApi(prompt), {
       maxRetries: this.maxRetries,
       baseDelayMs: this.baseDelayMs,
     });
+    return this.parseResponse(prompt, raw);
   }
 
   private async callApi(prompt: string): Promise<OpenAIResponseBody> {
@@ -169,11 +172,15 @@ export function extractTextAndCitations(raw: OpenAIResponseBody): {
   const seen = new Set<string>();
   let text = "";
 
-  for (const item of raw.output ?? []) {
-    if (item.type !== "message" || !item.content) continue;
+  // Defensive against wrong-typed fields on an HTTP-200 payload — a malformed
+  // body should yield an empty result, never throw (parsing is not retried).
+  const output = Array.isArray(raw.output) ? raw.output : [];
+  for (const item of output) {
+    if (item.type !== "message" || !Array.isArray(item.content)) continue;
     for (const part of item.content) {
       if (typeof part.text === "string") text += part.text;
-      for (const a of part.annotations ?? []) {
+      const annotations = Array.isArray(part.annotations) ? part.annotations : [];
+      for (const a of annotations) {
         if (a.type === "url_citation" && a.url && !seen.has(a.url)) {
           seen.add(a.url);
           citations.push(a.title ? { url: a.url, title: a.title } : { url: a.url });

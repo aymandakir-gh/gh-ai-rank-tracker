@@ -95,10 +95,13 @@ export class PerplexityProvider implements AnswerEngineProvider {
   }
 
   async query(prompt: string): Promise<EngineResponse> {
-    return withRetry(async () => this.parseResponse(prompt, await this.callApi(prompt)), {
+    // Retry only the network call. Parsing is deterministic — a malformed but
+    // HTTP-200 payload must not be retried as if it were a transient failure.
+    const raw = await withRetry(() => this.callApi(prompt), {
       maxRetries: this.maxRetries,
       baseDelayMs: this.baseDelayMs,
     });
+    return this.parseResponse(prompt, raw);
   }
 
   private async callApi(prompt: string): Promise<PerplexityResponseBody> {
@@ -138,7 +141,9 @@ export class PerplexityProvider implements AnswerEngineProvider {
 
   private parseResponse(prompt: string, raw: PerplexityResponseBody): EngineResponse {
     const text = raw.choices?.[0]?.message?.content ?? "";
-    const citations: Citation[] = (raw.citations ?? []).map((url) => ({ url }));
+    const citations: Citation[] = (Array.isArray(raw.citations) ? raw.citations : []).map(
+      (url) => ({ url }),
+    );
     return { engine: this.engine, prompt, text, citations, raw };
   }
 }

@@ -44,5 +44,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: Build (next build — catches RSC/route errors tsc + vitest miss)
+        run: npm run build
       - name: Test
         run: npm test

@@ -28,4 +28,9 @@ export default withSentryConfig(nextConfig, {
   disableLogger: true,
   automaticVercelMonitors: false,
   widenClientFileUpload: false,
+  // Skip source-map generation/upload when SENTRY_AUTH_TOKEN is absent
+  // (OSS forks / local dev) — avoids publishing source maps without a token.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
 });
