@@ -120,7 +120,7 @@ function ScoreRing({ score }: { score: number }) {
       <text
         x="68" y="82"
         textAnchor="middle"
-        fill="rgba(255,255,255,0.4)"
+        fill="#9ca3af"
         fontSize="11"
         fontFamily="inherit"
       >
@@ -464,7 +464,7 @@ function ResultsContent() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white">{result.brandName}</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-gray-400 text-sm mt-1">
               Scanned {new Date(result.scannedAt).toLocaleString()}
             </p>
           </div>
@@ -499,10 +499,10 @@ function ResultsContent() {
               className={`text-5xl font-extrabold ${scoreTextColor(result.visibilityScore)}`}
             >
               {result.visibilityScore}
-              <span className="text-xl font-normal text-gray-500 ml-1">/100</span>
+              <span className="text-xl font-normal text-gray-400 ml-1">/100</span>
             </h2>
             <p className="text-gray-200 text-lg font-medium">AI Visibility Score</p>
-            <p className="text-gray-500 text-sm">{scoreLabel}</p>
+            <p className="text-gray-400 text-sm">{scoreLabel}</p>
           </div>
         </section>
 
@@ -583,7 +583,7 @@ function ResultsContent() {
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[480px]">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-white/5">
+                  <tr className="text-left text-gray-400 border-b border-white/5">
                     <th className="pb-2 pr-4 font-medium">Prompt</th>
                     <th className="pb-2 pr-4 font-medium text-right w-16">Score</th>
                     <th className="pb-2 pr-4 font-medium text-right w-20">Mentions</th>
@@ -625,7 +625,7 @@ function ResultsContent() {
                               {safeHostname(topCitation.url)}
                             </a>
                           ) : (
-                            <span className="text-gray-600">—</span>
+                            <span className="text-gray-400">—</span>
                           )}
                         </td>
                       </tr>
