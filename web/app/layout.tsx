@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import './globals.css'
+import LangSync from '@/components/LangSync'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gh-ai-rank-tracker.vercel.app'
 
@@ -44,10 +45,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // lang="en" is the SSR default; LanguageProvider (client) updates it live
-    // suppressHydrationWarning prevents React noise when lang/dir change client-side
+    // lang="en" is the SSR default; LangSync (client) updates lang + dir from ?lang= param.
+    // suppressHydrationWarning prevents React noise when lang/dir change client-side.
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="antialiased">
+        <LangSync />
         <PostHogProvider>{children}</PostHogProvider>
       </body>
     </html>
