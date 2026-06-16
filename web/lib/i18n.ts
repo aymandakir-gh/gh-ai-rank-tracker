@@ -366,3 +366,161 @@ export const translations: Record<Locale, TranslationDict> = {
   de,
   'pt-br': ptBr,
 }
+
+// ─── Campaign dashboard namespace (v0.7.0) ──────────────────────────────────────
+// Keys are declared ONCE and shared across every locale, so the locale-parity
+// guarantee holds by construction: each locale supplies a values array in the
+// same order, merged into its dict below.
+const CAMPAIGN_KEYS = [
+  'nav.campaign',
+  'campaign.hero.title',
+  'campaign.hero.subtitle',
+  'campaign.form.brand',
+  'campaign.form.domain',
+  'campaign.form.prompts',
+  'campaign.form.promptPlaceholder',
+  'campaign.form.add',
+  'campaign.form.competitors',
+  'campaign.form.competitorName',
+  'campaign.form.run',
+  'campaign.form.running',
+  'campaign.form.demo',
+  'campaign.form.brandRequired',
+  'campaign.form.promptRequired',
+  'campaign.back',
+  'campaign.score.label',
+  'campaign.runs',
+  'campaign.trend.title',
+  'campaign.trend.visibility',
+  'campaign.trend.sov',
+  'campaign.trend.empty',
+  'campaign.trend.delta',
+  'campaign.engines.title',
+  'campaign.engines.mentionRate',
+  'campaign.engines.citationRate',
+  'campaign.competitors.title',
+  'campaign.competitors.you',
+  'campaign.prompts.title',
+  'campaign.prompts.mentions',
+  'campaign.prompts.citations',
+  'campaign.prompts.none',
+] as const
+
+const campaignValues: Record<Locale, readonly string[]> = {
+  en: [
+    'Campaigns', 'Campaign Dashboard',
+    "Track your brand's AI share of voice over time — across engines and against competitors.",
+    'Brand name', 'Domain', 'Prompts', 'Add a prompt…', 'Add', 'Competitors', 'Competitor name',
+    'Run campaign', 'Running campaign…', 'Load demo campaign', 'Brand name is required',
+    'Add at least one prompt', '← Back to scan', 'AI Visibility Score', 'runs',
+    'Share of voice over time', 'Visibility', 'Share of voice',
+    'Run this campaign again over time to build a trend.', 'Change since first run',
+    'Per-engine breakdown', 'Mention rate', 'Citation rate', 'Competitor comparison', 'you',
+    'Per-prompt drill-down', 'Mentions', 'Citations', 'No citations',
+  ],
+  ar: [
+    'الحملات', 'لوحة الحملات',
+    'تتبّع حصة علامتك التجارية في إجابات الذكاء الاصطناعي عبر الزمن — عبر المحركات وأمام المنافسين.',
+    'اسم العلامة التجارية', 'النطاق', 'الأسئلة', 'أضف سؤالاً…', 'إضافة', 'المنافسون', 'اسم المنافس',
+    'تشغيل الحملة', 'جارٍ تشغيل الحملة…', 'تحميل حملة تجريبية', 'اسم العلامة التجارية مطلوب',
+    'أضف سؤالاً واحداً على الأقل', '→ العودة إلى الفحص', 'درجة رؤية الذكاء الاصطناعي', 'تشغيلات',
+    'حصة الصوت عبر الزمن', 'الظهور', 'حصة الصوت',
+    'شغّل هذه الحملة مجدداً عبر الزمن لبناء اتجاه.', 'التغيّر منذ أول تشغيل',
+    'التفصيل حسب المحرّك', 'معدل الإشارة', 'معدل الاستشهاد', 'مقارنة المنافسين', 'أنت',
+    'تفصيل حسب السؤال', 'الإشارات', 'الاستشهادات', 'لا استشهادات',
+  ],
+  it: [
+    'Campagne', 'Dashboard campagne',
+    'Monitora la share of voice del tuo brand nelle risposte AI nel tempo — tra motori e rispetto ai concorrenti.',
+    'Nome del brand', 'Dominio', 'Prompt', 'Aggiungi un prompt…', 'Aggiungi', 'Concorrenti', 'Nome concorrente',
+    'Avvia campagna', 'Avvio campagna…', 'Carica campagna demo', 'Il nome del brand è obbligatorio',
+    'Aggiungi almeno un prompt', '← Torna alla scansione', 'AI Visibility Score', 'esecuzioni',
+    'Share of voice nel tempo', 'Visibilità', 'Share of voice',
+    'Esegui di nuovo questa campagna nel tempo per costruire un trend.', 'Variazione dalla prima esecuzione',
+    'Dettaglio per motore', 'Tasso di menzione', 'Tasso di citazione', 'Confronto concorrenti', 'tu',
+    'Dettaglio per prompt', 'Menzioni', 'Citazioni', 'Nessuna citazione',
+  ],
+  nl: [
+    'Campagnes', 'Campagne-dashboard',
+    'Volg de AI share of voice van je merk in de tijd — over engines heen en tegenover concurrenten.',
+    'Merknaam', 'Domein', 'Prompts', 'Voeg een prompt toe…', 'Toevoegen', 'Concurrenten', 'Naam concurrent',
+    'Campagne uitvoeren', 'Campagne uitvoeren…', 'Demo-campagne laden', 'Merknaam is verplicht',
+    'Voeg ten minste één prompt toe', '← Terug naar scan', 'AI Visibility Score', 'runs',
+    'Share of voice in de tijd', 'Zichtbaarheid', 'Share of voice',
+    'Voer deze campagne in de tijd opnieuw uit om een trend op te bouwen.', 'Verandering sinds de eerste run',
+    'Uitsplitsing per engine', 'Vermeldingsgraad', 'Citatiegraad', 'Concurrentievergelijking', 'jij',
+    'Uitsplitsing per prompt', 'Vermeldingen', 'Citaties', 'Geen citaties',
+  ],
+  zh: [
+    '活动', '活动仪表板',
+    '随时间跟踪您的品牌在 AI 回答中的声量份额——跨引擎并对比竞争对手。',
+    '品牌名称', '域名', '提示词', '添加提示词…', '添加', '竞争对手', '竞争对手名称',
+    '运行活动', '正在运行活动…', '加载演示活动', '品牌名称为必填项',
+    '请至少添加一个提示词', '← 返回扫描', 'AI 可见度评分', '次运行',
+    '声量份额随时间变化', '可见度', '声量份额',
+    '随时间再次运行此活动以构建趋势。', '自首次运行以来的变化',
+    '按引擎细分', '提及率', '引用率', '竞争对手对比', '您',
+    '按提示词细分', '提及', '引用', '无引用',
+  ],
+  es: [
+    'Campañas', 'Panel de campañas',
+    'Sigue la cuota de voz de tu marca en las respuestas de IA a lo largo del tiempo, entre motores y frente a competidores.',
+    'Nombre de la marca', 'Dominio', 'Prompts', 'Añade un prompt…', 'Añadir', 'Competidores', 'Nombre del competidor',
+    'Ejecutar campaña', 'Ejecutando campaña…', 'Cargar campaña demo', 'El nombre de la marca es obligatorio',
+    'Añade al menos un prompt', '← Volver al escaneo', 'Puntuación de visibilidad IA', 'ejecuciones',
+    'Cuota de voz a lo largo del tiempo', 'Visibilidad', 'Cuota de voz',
+    'Ejecuta esta campaña de nuevo a lo largo del tiempo para crear una tendencia.', 'Cambio desde la primera ejecución',
+    'Desglose por motor', 'Tasa de mención', 'Tasa de citación', 'Comparación de competidores', 'tú',
+    'Desglose por prompt', 'Menciones', 'Citas', 'Sin citas',
+  ],
+  fr: [
+    'Campagnes', 'Tableau de bord des campagnes',
+    'Suivez la part de voix de votre marque dans les réponses IA au fil du temps — entre moteurs et face aux concurrents.',
+    'Nom de la marque', 'Domaine', 'Prompts', 'Ajouter un prompt…', 'Ajouter', 'Concurrents', 'Nom du concurrent',
+    'Lancer la campagne', 'Lancement de la campagne…', 'Charger la campagne démo', 'Le nom de la marque est obligatoire',
+    'Ajoutez au moins un prompt', '← Retour au scan', 'Score de visibilité IA', 'exécutions',
+    'Part de voix au fil du temps', 'Visibilité', 'Part de voix',
+    'Relancez cette campagne au fil du temps pour construire une tendance.', 'Évolution depuis la première exécution',
+    'Détail par moteur', 'Taux de mention', 'Taux de citation', 'Comparaison des concurrents', 'vous',
+    'Détail par prompt', 'Mentions', 'Citations', 'Aucune citation',
+  ],
+  de: [
+    'Kampagnen', 'Kampagnen-Dashboard',
+    'Verfolgen Sie den AI-Share-of-Voice Ihrer Marke im Zeitverlauf — über Engines hinweg und gegen Wettbewerber.',
+    'Markenname', 'Domain', 'Prompts', 'Prompt hinzufügen…', 'Hinzufügen', 'Wettbewerber', 'Name des Wettbewerbers',
+    'Kampagne starten', 'Kampagne läuft…', 'Demo-Kampagne laden', 'Markenname ist erforderlich',
+    'Fügen Sie mindestens einen Prompt hinzu', '← Zurück zum Scan', 'KI-Sichtbarkeitsscore', 'Läufe',
+    'Share of Voice im Zeitverlauf', 'Sichtbarkeit', 'Share of Voice',
+    'Führen Sie diese Kampagne im Zeitverlauf erneut aus, um einen Trend aufzubauen.', 'Veränderung seit dem ersten Lauf',
+    'Aufschlüsselung pro Engine', 'Erwähnungsrate', 'Zitationsrate', 'Wettbewerbsvergleich', 'Sie',
+    'Aufschlüsselung pro Prompt', 'Erwähnungen', 'Zitate', 'Keine Zitate',
+  ],
+  'pt-br': [
+    'Campanhas', 'Painel de campanhas',
+    'Acompanhe a participação de voz da sua marca nas respostas de IA ao longo do tempo — entre motores e frente aos concorrentes.',
+    'Nome da marca', 'Domínio', 'Prompts', 'Adicione um prompt…', 'Adicionar', 'Concorrentes', 'Nome do concorrente',
+    'Executar campanha', 'Executando campanha…', 'Carregar campanha demo', 'O nome da marca é obrigatório',
+    'Adicione pelo menos um prompt', '← Voltar ao scan', 'AI Visibility Score', 'execuções',
+    'Participação de voz ao longo do tempo', 'Visibilidade', 'Participação de voz',
+    'Execute esta campanha novamente ao longo do tempo para construir uma tendência.', 'Variação desde a primeira execução',
+    'Detalhamento por motor', 'Taxa de menção', 'Taxa de citação', 'Comparação de concorrentes', 'você',
+    'Detalhamento por prompt', 'Menções', 'Citações', 'Sem citações',
+  ],
+}
+
+for (const loc of Object.keys(translations) as Locale[]) {
+  const vals = campaignValues[loc]
+  CAMPAIGN_KEYS.forEach((k, i) => {
+    translations[loc][k] = vals[i] as string
+  })
+}
+
+/** Translate `key` for `locale`, falling back to English then the raw key. */
+export function t(locale: Locale, key: string): string {
+  return translations[locale]?.[key] ?? translations.en[key] ?? key
+}
+
+/** True when `s` is a supported locale code. */
+export function isLocale(s: string | null | undefined): s is Locale {
+  return !!s && s in translations
+}

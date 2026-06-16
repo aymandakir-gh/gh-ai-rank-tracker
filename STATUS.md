@@ -3,6 +3,26 @@
 Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
 v0.4.0 history is in [PLAN.md](PLAN.md).
 
+## Release: v0.7.0 ✅ — Web campaign dashboard (trends/engines/competitors/drill-down)
+
+- **Goal met (item 5 + web part of 3).** New `/campaign` dashboard: a
+  share-of-voice **trend chart** over time, a **per-engine breakdown**, a
+  **competitor comparison**, and an expandable **per-prompt drill-down** (with
+  recovered citation URLs). Tailwind-only SVG/`div` charts + a `<table>` a11y
+  fallback (no chart library).
+- **i18n:** 32 new `campaign.*` keys across all **9 locales**; keys are declared
+  once and shared so locale parity holds by construction (asserted by the i18n
+  test). `/campaign` is fully translated via `?lang=` with a language selector
+  (incl. RTL for Arabic).
+- **Self-contained:** `POST /api/campaign` runs the engine in-process. Demo mode
+  replays the deterministic 4-week history (a real, engine-scored rising trend);
+  custom mode runs once offline (single trend point). Stateless → runs anywhere
+  (incl. serverless); persistent history lives in the CLI/Hono-API store (M1).
+- **Tests:** +20 web (`campaign-mapper`, `campaign-route`, `trend-chart`,
+  `campaign-dashboard`) → web **138 passing**; engine **266 + 4 skip**.
+  Typecheck + `next build` green. Verified end-to-end on a running `next start`
+  server (demo trend 34→92 over 4 points; custom single run).
+
 ## Release: v0.6.0 ✅ — Google Gemini adapter (4th engine)
 
 - **Goal met (item 4).** `GeminiProvider` (generateContent + `google_search`

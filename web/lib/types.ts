@@ -93,3 +93,74 @@ export type EmailGateState =
   | 'submitting'
   | 'success'
   | 'submit_error';
+
+// ─── Campaign dashboard (tracking over time) ────────────────────────────────
+
+/** One point on the share-of-voice / visibility trend. */
+export interface WebTrendPoint {
+  /** ISO timestamp of the run. */
+  date: string;
+  /** 0..100 weighted visibility score. */
+  visibility: number;
+  /** 0..100 tracked-brand share of voice. */
+  shareOfVoice: number;
+}
+
+/** Per-engine aggregate for the tracked brand. */
+export interface WebEngineBreakdown {
+  engine: string;
+  /** 0..100 mean visibility score on this engine. */
+  score: number;
+  /** 0..100 % of prompts mentioned on this engine. */
+  mentionRate: number;
+  /** 0..100 % of prompts cited on this engine. */
+  citationRate: number;
+}
+
+/** Head-to-head competitor row. */
+export interface WebCompetitorEntry {
+  brand: string;
+  isTracked: boolean;
+  /** 0..100 share of voice. */
+  shareOfVoice: number;
+  /** SoV gap vs the tracked brand in points (-100..100); 0 on the tracked row. */
+  gapVsTracked: number;
+}
+
+/** Per-prompt drill-down with the citations behind the score. */
+export interface WebPromptDrilldown {
+  prompt: string;
+  weight: number;
+  /** 0..100 prompt score (mean across engines). */
+  score: number;
+  /** Number of engines that mentioned the brand. */
+  mentions: number;
+  /** Citations the brand earned, with engine + rank + (when known) URL. */
+  citations: Array<{ engine: string; rank: number; url?: string }>;
+}
+
+/** Full campaign dashboard payload. */
+export interface WebCampaignResult {
+  campaignName: string;
+  brand: string;
+  generatedAt: string;
+  /** 0..100 visibility of the latest run. */
+  visibilityScore: number;
+  /** Visibility delta first→last run (0 with <2 runs). */
+  visibilityDelta: number;
+  /** Tracked SoV delta first→last run, in points (0 with <2 runs). */
+  shareOfVoiceDelta: number;
+  trend: WebTrendPoint[];
+  engineBreakdown: WebEngineBreakdown[];
+  competitors: WebCompetitorEntry[];
+  prompts: WebPromptDrilldown[];
+  /** Number of runs in the trend. */
+  runCount: number;
+}
+
+/** API response envelope for POST /api/campaign. */
+export interface CampaignApiResponse {
+  ok: boolean;
+  result?: WebCampaignResult;
+  error?: string;
+}

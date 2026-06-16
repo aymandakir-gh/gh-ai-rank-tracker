@@ -181,6 +181,14 @@ export default function HomePage() {
           <p className="text-gray-400 text-lg">
             See how AI systems mention your brand across ChatGPT, Perplexity, and more.
           </p>
+          <p className="mt-4">
+            <a
+              href="/campaign"
+              className="inline-block rounded-lg border border-white/10 px-4 py-2 text-sm text-brand-400 hover:bg-white/5 transition-colors"
+            >
+              Track over time → Campaign dashboard
+            </a>
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">

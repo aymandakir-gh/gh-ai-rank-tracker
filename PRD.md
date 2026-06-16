@@ -111,12 +111,19 @@ citations). Tailwind-only SVG/div charts + `<table>` fallbacks. All new strings
 added to all 9 locales. Server-side persistence via `JsonFileStore`; demo works
 keyless and accumulates history on repeat runs; single-run degradation noted.
 
-**Definition of Done**
-- [ ] Trend chart renders a multi-point series and a single-point series without
-      error; a11y `<table>` fallback present.
-- [ ] Per-engine breakdown + competitor comparison + drill-down render from real
-      mapped data; i18n keys exist in every locale (test asserts parity).
-- [ ] `next build` green; web suite green; mobile layout intact.
+**Definition of Done** — ✅ shipped (tag v0.7.0)
+- [x] `TrendChart` renders a multi-point series (two SVG polylines), a
+      single-point series (dots + note) and an empty state; always emits a
+      visually-hidden `<table>` fallback. Tested.
+- [x] Per-engine breakdown + competitor comparison + expandable per-prompt
+      drill-down (with recovered citation URLs) render from real mapped data;
+      32 `campaign.*` keys added to all 9 locales — parity guaranteed by
+      construction (keys declared once) and asserted by the i18n test.
+- [x] `/campaign` page is fully i18n'd via `?lang=` with a language selector;
+      `next build` green; web suite **138 passing** (+20); verified end-to-end on
+      a running `next start` server (demo 4-pt rising trend 34→92; custom 1-pt).
+      Stateless by design (self-contained, serverless-safe); persistent history
+      lives in the CLI/Hono-API store from M1.
 
 ## M4 — v0.8.0 · Exportable campaign report
 
