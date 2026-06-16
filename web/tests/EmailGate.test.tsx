@@ -18,7 +18,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { EmailGate } from "../../web/components/EmailGate";
+import { EmailGate } from "@/components/EmailGate";
 
 // ── Shared base props ─────────────────────────────────────────────────────────
 
@@ -252,7 +252,9 @@ describe("variant copy", () => {
     const { rerender } = render(
       <EmailGate {...BASE} domain="testco.io" variant="a" />
     );
-    expect(screen.getByText(/testco\.io/)).toBeInTheDocument();
+    // The domain appears in both the score-badge label and the subtitle, so
+    // match all occurrences rather than asserting a single element.
+    expect(screen.getAllByText(/testco\.io/).length).toBeGreaterThan(0);
 
     rerender(<EmailGate {...BASE} domain="testco.io" variant="b" />);
     expect(screen.getAllByText(/testco\.io/).length).toBeGreaterThan(0);

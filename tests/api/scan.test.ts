@@ -32,8 +32,14 @@ const unlimitedLimiter: RateLimiter = { check: () => true };
 
 /** Aegis guard that always passes — eliminates aegis noise in other suites. */
 const passAegis: AegisGuard = {
-  scan: (_input: string, _ctx?: { scope: string }) =>
-    Promise.resolve({ safe: true }),
+  scan: async () => ({ safe: true, score: 0 }),
+};
+
+/** Loose shape for decoded JSON scan responses used in assertions. */
+type ScanBody = {
+  ok?: boolean;
+  error?: string;
+  result?: { visibilityScore?: number; brand?: string };
 };
 
 // ─── sanitizeBrandName ────────────────────────────────────────────────────────
@@ -184,7 +190,10 @@ describe("GET /health", () => {
 
   it("body contains ok:true, version, and ts", async () => {
     const app = createApp({});
-    const body = await app.request("/health").then((r) => r.json());
+    // Hono's app.request() resolves to a Response for sync handlers (no .then on
+    // the call itself) — await it, then read the JSON body.
+    const res = await app.request("/health");
+    const body = (await res.json()) as { ok: boolean; version: string; ts: number };
     expect(body.ok).toBe(true);
     expect(typeof body.version).toBe("string");
     expect(typeof body.ts).toBe("number");
@@ -194,7 +203,7 @@ describe("GET /health", () => {
 // ─── POST /api/scan — authentication ─────────────────────────────────────────
 
 describe("POST /api/scan — authentication", () => {
-  const makeReq = (extra?: HeadersInit) =>
+  const makeReq = (extra?: Record<string, string>) =>
     ({
       method: "POST",
       headers: {
@@ -265,7 +274,7 @@ describe("POST /api/scan — rate limiting", () => {
       body: scanBody,
     });
     expect(res.status).toBe(429);
-    const body = await res.json();
+    const body = (await res.json()) as ScanBody;
     expect(body.ok).toBe(false);
   });
 
@@ -290,7 +299,7 @@ describe("POST /api/scan — rate limiting", () => {
 
 describe("POST /api/scan — body validation", () => {
   const app = createApp({ rateLimiter: unlimitedLimiter, aegisGuard: passAegis });
-  const hdrs: HeadersInit = {
+  const hdrs: Record<string, string> = {
     "Content-Type": "application/json",
     "x-forwarded-for": "127.0.0.1",
   };
@@ -338,7 +347,7 @@ describe("POST /api/scan — body validation", () => {
       body: JSON.stringify({ url: "https://example.com", providers: ["nonexistent"] }),
     });
     expect(res.status).toBe(400);
-    const body = await res.json();
+    const body = (await res.json()) as ScanBody;
     expect(body.error).toMatch(/Unknown provider/);
   });
 });
@@ -381,7 +390,7 @@ describe("POST /api/scan — aegis guard", () => {
       },
       body: JSON.stringify({ url: "https://example.com", providers: ["mock"] }),
     });
-    const body = await res.json();
+    const body = (await res.json()) as ScanBody;
     expect(body.ok).toBe(false);
     expect(body.error).toContain("JAILBREAK");
   });
@@ -401,12 +410,12 @@ describe("POST /api/scan — happy path", () => {
       body: JSON.stringify({ url: "https://growthackers.io", providers: ["mock"] }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as ScanBody;
     expect(body.ok).toBe(true);
     expect(body.result).toBeDefined();
-    expect(typeof body.result.visibilityScore).toBe("number");
-    expect(body.result.visibilityScore).toBeGreaterThanOrEqual(0);
-    expect(body.result.visibilityScore).toBeLessThanOrEqual(100);
+    expect(typeof body.result?.visibilityScore).toBe("number");
+    expect(body.result?.visibilityScore).toBeGreaterThanOrEqual(0);
+    expect(body.result?.visibilityScore).toBeLessThanOrEqual(100);
   });
 
   it("defaults to mock provider when providers list is omitted", async () => {
@@ -420,7 +429,7 @@ describe("POST /api/scan — happy path", () => {
       body: JSON.stringify({ url: "https://example.com" }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
   });
 
@@ -435,7 +444,7 @@ describe("POST /api/scan — happy path", () => {
       body: JSON.stringify({ url: "https://acme.io", providers: ["mock"] }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { result: { brand: string } };
     expect(body.result.brand).toBe("Acme");
   });
 });

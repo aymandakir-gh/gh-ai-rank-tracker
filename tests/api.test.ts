@@ -226,7 +226,8 @@ describe("POST /api/scan — happy path", () => {
     expect(typeof json.result?.visibilityScore).toBe("number");
     expect(json.result?.visibilityScore).toBeGreaterThanOrEqual(0);
     expect(json.result?.visibilityScore).toBeLessThanOrEqual(100);
-    expect(json.result?.brand).toBe("Growthhackers");
+    // brand is derived from the first DNS label of the URL: growthackers.io → "Growthackers"
+    expect(json.result?.brand).toBe("Growthackers");
   });
 
   it("defaults to the mock provider when 'providers' is omitted", async () => {

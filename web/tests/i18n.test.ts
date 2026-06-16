@@ -11,7 +11,7 @@ import {
   RTL_LOCALES,
   type Locale,
   type TranslationDict,
-} from '../../web/lib/i18n'
+} from '@/lib/i18n'
 
 const ALL_LOCALES: Locale[] = ['en', 'ar', 'it', 'nl', 'zh', 'es', 'fr', 'de', 'pt-br']
 const EN_KEYS = Object.keys(translations.en).sort()
@@ -155,9 +155,13 @@ describe('t() fallback', () => {
   })
 
   it('falls back to EN when key is missing from a locale dict', () => {
-    // Simulate a locale with a missing key
+    // Simulate a locale dict that is missing the requested key. Looking the key
+    // up through a function keeps the value genuinely `string | undefined`
+    // (the compiler can't prove it's always nullish — avoids TS2871).
+    const lookup = (dict: TranslationDict, key: string): string | undefined => dict[key]
+    const partialLocale: TranslationDict = {}
     const fallback =
-      (undefined as string | undefined) ?? translations.en['nav.title'] ?? 'nav.title'
+      lookup(partialLocale, 'nav.title') ?? translations.en['nav.title'] ?? 'nav.title'
     expect(fallback).toBe('AI Rank Tracker')
   })
 

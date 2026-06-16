@@ -79,16 +79,15 @@ describe("InMemoryRateLimiter — sliding window", () => {
     expect(limiter.check("6.6.6.6")).toBe(false);
   });
 
-  it("allows request exactly at window boundary (cutoff = now - windowMs, exclusive)", () => {
+  it("expires a timestamp exactly at the window boundary (cutoff is exclusive)", () => {
     const limiter = new InMemoryRateLimiter(60_000, 1);
-    limiter.check("7.7.7.7"); // t=0 → limit reached
-    // advance to exactly windowMs — the t=0 timestamp is NOT > cutoff (cutoff = now - 60000 = 0)
-    // so it should still be in-window → blocked
-    tick(60_000);
-    expect(limiter.check("7.7.7.7")).toBe(false);
+    expect(limiter.check("7.7.7.7")).toBe(true); // t=0 → recorded, limit reached
+    expect(limiter.check("7.7.7.7")).toBe(false); // t=0 → blocked
 
-    // advance 1 ms more → cutoff = 1, t=0 is NOT > 1 → expires → allowed
-    tick(1);
+    // Advance to exactly windowMs. cutoff = now - 60000 = 0; the t=0 timestamp is
+    // NOT > 0, so it is filtered out (the old edge of the window is exclusive) →
+    // the bucket is empty again → the request is allowed.
+    tick(60_000);
     expect(limiter.check("7.7.7.7")).toBe(true);
   });
 
@@ -148,8 +147,11 @@ describe("InMemoryRateLimiter — sliding window", () => {
   });
 
   it("handles empty-string IP key without throwing", () => {
+    // An empty-string key can occur when no IP can be resolved — it must not throw.
+    expect(() => new InMemoryRateLimiter(60_000, 1).check("")).not.toThrow();
+
+    // And it is rate-limited like any other key.
     const limiter = new InMemoryRateLimiter(60_000, 1);
-    expect(() => limiter.check("")).not.toThrow();
     expect(limiter.check("")).toBe(true);  // first call: allowed
     expect(limiter.check("")).toBe(false); // second call: blocked
   });

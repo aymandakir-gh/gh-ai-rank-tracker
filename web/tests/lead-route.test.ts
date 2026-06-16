@@ -43,7 +43,7 @@ vi.mock('next/server', () => {
   return { NextRequest: MockNextRequest, NextResponse }
 })
 
-import { POST } from '../../web/app/api/lead/route'
+import { POST } from '@/app/api/lead/route'
 import { NextRequest } from 'next/server'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

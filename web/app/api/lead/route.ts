@@ -16,7 +16,14 @@ export const dynamic = 'force-dynamic';
 const LEADS_API_URL = process.env.LEADS_API_URL ?? '';
 
 const LeadSchema = z.object({
-  email: z.string().email().max(254),
+  // Trim surrounding whitespace before validating so " a@b.com " is accepted and
+  // forwarded in normalised form. The explicit messages mention "email" so the
+  // client can surface a useful error.
+  email: z
+    .string({ required_error: 'A valid email address is required' })
+    .trim()
+    .email('A valid email address is required')
+    .max(254),
   brandName: z.string().max(200).optional(),
   visibilityScore: z.number().min(0).max(100).optional(),
 });

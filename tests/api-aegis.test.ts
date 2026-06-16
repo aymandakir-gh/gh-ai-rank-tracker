@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { createApp, type RateLimiter } from "../src/api/scan";
-import type { AegisGuard, ScanResult } from "../aegis";
+import type { AegisGuard, ScanResult, ThreatType } from "../src/aegis";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ function blockingGuard(threatType = "PROMPT_INJECTION"): AegisGuard {
     scan: vi.fn().mockResolvedValue({
       safe: false,
       score: 95,
-      threatType,
+      threatType: threatType as ThreatType,
       details: [`Blocked by test stub: ${threatType}`],
     } satisfies ScanResult),
   };
@@ -56,7 +56,7 @@ describe("POST /api/scan — Aegis guard block path", () => {
     const res = await app.request(
       scanRequest({ url: "https://acme.io" }),
     );
-    const json = await res.json();
+    const json = (await res.json()) as { ok?: boolean; error?: string };
 
     expect(res.status).toBe(400);
     expect(json.ok).toBe(false);
@@ -69,7 +69,7 @@ describe("POST /api/scan — Aegis guard block path", () => {
     const res = await app.request(
       scanRequest({ url: "https://acme.io" }),
     );
-    const json = await res.json();
+    const json = (await res.json()) as { ok?: boolean; error?: string };
 
     expect(res.status).toBe(400);
     expect(json.ok).toBe(false);
@@ -83,7 +83,7 @@ describe("POST /api/scan — Aegis guard block path", () => {
     const res = await app.request(
       scanRequest({ url: "https://acme.io" }),
     );
-    const json = await res.json();
+    const json = (await res.json()) as { ok?: boolean; error?: string };
 
     expect(res.status).toBe(400);
     expect(json.error).toContain("UNKNOWN_THREAT");
@@ -108,7 +108,7 @@ describe("POST /api/scan — Aegis guard block path", () => {
     const res = await app.request(
       scanRequest({ url: "https://acme.io", providers: ["mock"] }),
     );
-    const json = await res.json();
+    const json = (await res.json()) as { ok?: boolean; error?: string };
 
     expect(res.status).toBe(200);
     expect(json.ok).toBe(true);

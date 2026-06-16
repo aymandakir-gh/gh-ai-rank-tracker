@@ -1,13 +1,10 @@
 import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
 
+// Root project: the TypeScript engine + Hono API (src/**).
+// React/Next.js web tests live under web/ and run via `cd web && npm test`.
 export default defineConfig({
-  plugins: [react()],
   test: {
-    // include both backend .ts and React .tsx test files
-    include: ["tests/**/*.test.{ts,tsx}"],
-    // jsdom for React component tests; node (default) for everything else
-    environmentMatchGlobs: [["tests/web/**", "jsdom"]],
-    setupFiles: ["tests/web/setup.ts"],
+    include: ["tests/**/*.test.ts"],
+    environment: "node",
   },
 });
