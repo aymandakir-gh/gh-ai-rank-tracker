@@ -13,8 +13,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock posthog-js BEFORE importing the component ───────────────────────────
 // posthog-js has side-effects on import; mock the entire module.
-const mockInit = vi.fn()
-const mockCapture = vi.fn()
+// vi.mock is hoisted above the file body, so the spies it references must be
+// created via vi.hoisted() (a plain top-level const would not exist yet).
+const { mockInit, mockCapture } = vi.hoisted(() => ({
+  mockInit: vi.fn(),
+  mockCapture: vi.fn(),
+}))
 
 vi.mock('posthog-js', () => ({
   default: {
