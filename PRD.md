@@ -149,10 +149,17 @@ keyless and accumulates history on repeat runs; single-run degradation noted.
 launch-grade README (campaigns, store, trends, Gemini, export, 4 engines);
 `docs/demo.tape` + recorded artifact; verify CLI from `npm pack` tarball.
 
-**Definition of Done**
-- [ ] METHODOLOGY.md explains every number the tool reports and its limits.
-- [ ] README reflects v1.0 surface; demo artifact committed/referenced.
-- [ ] Packed build (`npm pack` → install → `gh-ai-rank-tracker --demo`) runs.
+**Definition of Done** — ✅ shipped (tag v0.9.0)
+- [x] `METHODOLOGY.md` explains the score, share-of-voice, per-engine breakdown
+      and trend math (matching the code) plus 8 documented limitations.
+- [x] README rewritten for the v1.0 surface (campaigns, store, trends, 4 engines
+      incl. Gemini, export, web dashboard) + methodology link.
+- [x] Demo committed: runnable `docs/demo.tape` (vhs) + a real captured
+      `docs/demo.txt` transcript (vhs/asciinema not installed in this env → the
+      GIF is rendered by running the tape).
+- [x] Packed build verified: `npm pack` → install in a temp dir → the installed
+      `gh-ai-rank-tracker` bin runs `--help`/`--demo`/`campaign run`, and
+      `require()` exposes runCampaign/JsonFileStore/GeminiProvider/renderCampaignPdf.
 
 ## M6 — v1.0.0 · Adversarial review + release
 

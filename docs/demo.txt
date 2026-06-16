@@ -1,0 +1,42 @@
+$ gh-ai-rank-tracker --demo
+AI Visibility Report — GrowthHackers
+Score: 42.3/100  |  engines: perplexity, chatgpt
+Coverage: mention 50% · citation 50%
+
+Prompts:
+  [ 82.5] MC  best growth marketing agencies for B2B SaaS
+  [    0] --  what is generative engine optimization (GEO)
+  [   45] MC  how to get cited by AI answer engines
+  [    0] --  tools to measure brand visibility in ChatGPT and Perplexity
+
+Share of voice:
+   40%  HubSpot (presence 4)
+   30%  GrowthHackers (presence 3)
+   30%  Semrush (presence 3)
+
+Recommendations:
+  [medium] Moderate AI visibility (42.3/100). Room to improve mention prominence and earn more top-ranked citations.
+  [high] 2/4 prompts return no mention of GrowthHackers. Create authoritative, directly-quotable content targeting: "what is generative engine optimization (GEO)", "tools to measure brand visibility in ChatGPT and Perplexity".
+  [medium] HubSpot leads share-of-voice (40% vs your 30%). Study the prompts where it gets cited and target the same intents.
+
+$ gh-ai-rank-tracker campaign run --demo        # run 1, persisted
+Campaign "GrowthHackers — GEO/AEO visibility" — run run_1781607318990_xyheih saved. 1 run(s) recorded.
+
+$ gh-ai-rank-tracker campaign run --demo        # run 2, same store
+Campaign "GrowthHackers — GEO/AEO visibility" — run run_1781607319019_defch0 saved. 2 run(s) recorded. Visibility +0 since first run.
+
+$ gh-ai-rank-tracker campaign list
+Stored campaigns:
+  demo-growthhackers  —  GrowthHackers — GEO/AEO visibility  (2 run(s), latest 42.3/100 @ 2026-06-16T10:55:19.019Z)
+
+$ gh-ai-rank-tracker campaign history demo-growthhackers
+Trend — GrowthHackers (campaign demo-growthhackers)
+
+  Date                      Visibility   SoV
+  2026-06-16T10:55:18.990Z     42.3/100    30%
+  2026-06-16T10:55:19.019Z     42.3/100    30%
+
+  Δ visibility +0   ·   Δ SoV +0%
+
+$ gh-ai-rank-tracker campaign export demo-growthhackers --format md --out report.md
+[gh-ai-rank-tracker] Wrote MD report for "demo-growthhackers" → report.md

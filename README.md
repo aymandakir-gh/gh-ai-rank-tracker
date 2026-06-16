@@ -30,6 +30,9 @@ This tool turns those questions into a single, repeatable **AI Visibility Score 
 - **Share of voice** — benchmark presence and mention volume against any set of competitors.
 - **Coverage + gaps** — see exactly which prompts return zero mentions of you.
 - **Recommendations** — prioritized, rule-based next steps (high / medium / low).
+- **Campaigns & tracking over time** — define a prompt *set* per brand, run it repeatedly, and persist every run to a **local-first JSON store** (no external DB) so you can watch your visibility + share-of-voice **trend across runs**.
+- **Competitor share-of-voice** — track competitors alongside your brand and get a head-to-head SoV gap, aggregated across prompts × engines.
+- **Exportable reports** — a Markdown report or a dependency-free **PDF**.
 - **Live answer engines** — first-class adapters for **OpenAI**, **Perplexity**, **Anthropic** (Claude) and **Google Gemini**, all behind your own API keys and all implementing one `AnswerEngineProvider` interface. The deterministic `MockProvider` is the no-key default, so the whole engine still runs offline and is fully unit-tested.
 - **Reports** — console, Markdown, or raw JSON.
 
@@ -84,7 +87,68 @@ const report = await runTracking(config, [new MockProvider({ /* scripted answers
 console.log(report.visibilityScore, report.shareOfVoice, report.gaps);
 ```
 
+## Campaigns & tracking over time
+
+A **campaign** is a named brand + competitors + a *set* of prompts. Each run is
+scored, benchmarked for share-of-voice, and appended to a **local-first JSON
+store** (default `./.tracker/store.json`, or set `TRACKER_STORE_PATH`) — no
+external database. Run it again over time and the trend builds up.
+
+```bash
+# Run + persist the built-in demo campaign (no API keys):
+npm run cli -- campaign run --demo
+
+# Run your own campaign (JSON Campaign file) against a live engine:
+OPENAI_API_KEY=sk-... npm run cli -- campaign run --config ./my-campaign.json --provider openai
+
+npm run cli -- campaign list                       # stored campaigns + run counts
+npm run cli -- campaign history demo-growthhackers # visibility + SoV trend over time
+```
+
+A `Campaign` JSON file looks like:
+
+```json
+{
+  "id": "acme-geo",
+  "name": "Acme — GEO visibility",
+  "brand": { "name": "Acme", "domain": "acme.com" },
+  "competitors": [{ "name": "Rival", "domain": "rival.com" }],
+  "prompts": [
+    { "prompt": "best widget vendors for enterprise", "weight": 2 },
+    { "prompt": "how to choose a widget platform", "weight": 1 }
+  ]
+}
+```
+
+From code, the same flow is `runCampaign(campaign, providers)` → append to a
+`JsonFileStore`/`InMemoryStore` → `computeTrend(runs)`.
+
+## Export a report
+
+```bash
+npm run cli -- campaign export acme-geo --format md  --out report.md
+npm run cli -- campaign export acme-geo --format pdf --out report.pdf
+```
+
+The PDF writer is pure TypeScript (no native deps): a valid PDF 1.4 with the
+base-14 Helvetica font and a correct cross-reference table — it opens in any
+viewer. The web dashboard also offers a one-click Markdown download.
+
+## Web dashboard
+
+The Next.js app (`web/`) includes a **campaign dashboard** (`/campaign`): a
+share-of-voice **trend chart over time**, a **per-engine breakdown**, a
+**competitor comparison**, and an expandable **per-prompt drill-down** — fully
+internationalized across 9 languages (`?lang=`), Tailwind-only charts with
+`<table>` accessibility fallbacks, and self-contained (works without API keys).
+
+```bash
+cd web && npm install && npm run dev   # http://localhost:3003/campaign
+```
+
 ## How the score works
+
+> Full math + assumptions + limitations: **[METHODOLOGY.md](METHODOLOGY.md)**.
 
 Each (brand, response) pair earns up to 100 points from four signals (weights are tunable via `ScoreWeights`):
 
@@ -163,27 +227,21 @@ const report = await runTracking(config, [
 > library never call out unless you select a live `--provider`; the default is
 > always the offline `MockProvider`.
 
-## Recording the demo
+## Demo
 
-The hero placeholder above should be replaced with a short terminal recording
-of `npm run demo`. Record it with [vhs](https://github.com/charmbracelet/vhs)
-(scriptable, reproducible) or [asciinema](https://asciinema.org/):
+A committed, plain-text transcript of the real CLI (`--demo`, `campaign
+run/list/history/export`) lives at **[`docs/demo.txt`](docs/demo.txt)** — a
+zero-dependency fallback for the animated GIF.
+
+To render the GIF, a ready-to-run [vhs](https://github.com/charmbracelet/vhs)
+script is committed at **[`docs/demo.tape`](docs/demo.tape)**:
 
 ```bash
-# Option A — vhs (renders straight to a GIF)
-#   docs/demo.tape:
-#     Output docs/demo.gif
-#     Set Width 1200
-#     Type "npm run demo" Enter
-#     Sleep 4s
-vhs docs/demo.tape          # → docs/demo.gif, then reference it in the placeholder above
-
-# Option B — asciinema
-asciinema rec docs/demo.cast -c "npm run demo"
+vhs docs/demo.tape          # → docs/demo.gif
 ```
 
-Commit the resulting `docs/demo.gif` (or `.cast`) and swap it into the
-`<!-- DEMO PLACEHOLDER -->` block at the top of this README.
+Then swap `docs/demo.gif` into the `<!-- DEMO PLACEHOLDER -->` block at the top
+of this README.
 
 ## API
 
@@ -193,6 +251,8 @@ The Hono HTTP API (v0.3) exposes:
 |---|---|---|---|
 | `GET` | `/health` | None | Health check — returns `{ ok, version, ts }` |
 | `POST` | `/api/scan` | Bearer | Run a full AI visibility scan for a URL |
+| `POST` | `/api/campaign` | Bearer | Run + persist a campaign; returns the run, full history and trend |
+| `GET` | `/api/campaign/:id` | Bearer | Read a campaign's persisted history + trend |
 
 ### POST /api/scan
 
@@ -259,7 +319,9 @@ SCAN_API_URL=http://localhost:3000 npm run dev
 - [x] Email gate + lead capture (web)
 - [x] Observability — Sentry + PostHog on the web app (graceful-degrade)
 - [x] Campaigns + local-first persisted store + historical trend tracking
-- [x] Competitor share-of-voice benchmarking (CLI + API)
+- [x] Competitor share-of-voice benchmarking (CLI + API + web)
+- [x] Web campaign dashboard — trend chart, per-engine, competitor, drill-down (i18n)
+- [x] Exportable campaign report — Markdown + dependency-free PDF
 - [ ] Google AI Overviews adapter
 
 ## Built by GrowthHackers

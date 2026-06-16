@@ -3,6 +3,25 @@
 Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
 v0.4.0 history is in [PLAN.md](PLAN.md).
 
+## Release: v0.9.0 ✅ — Methodology, launch docs & demo
+
+- **Goal met (item 8, docs/demo).** Launch-grade documentation:
+  - **[METHODOLOGY.md](METHODOLOGY.md)** — the exact math behind the visibility
+    score (35/20/30/15 weights, prominence floors, rank prominence),
+    share-of-voice (presence-based, across prompts × engines), per-engine
+    breakdown and trend deltas, plus 8 documented limitations.
+  - **README** rewritten for the v1.0 surface: campaigns + local-first store,
+    trends, 4 engines (incl. Gemini), Markdown/PDF export, web dashboard, and a
+    methodology link.
+  - **Demo:** a runnable `docs/demo.tape` (vhs) + a real captured
+    `docs/demo.txt` transcript (vhs/asciinema aren't installed here, so the GIF
+    is produced by running the tape).
+- **Packed-build CLI verified:** `npm pack` → install the tarball in a clean temp
+  project → the installed `gh-ai-rank-tracker` bin runs `--help`, `--demo` and
+  `campaign run`; `require('gh-ai-rank-tracker')` exposes `runCampaign`,
+  `JsonFileStore`, `GeminiProvider`, `renderCampaignPdf`.
+- No code change → engine **275 + 4 skip**, web **142** unchanged; CI green.
+
 ## Release: v0.8.0 ✅ — Exportable campaign report (Markdown + PDF)
 
 - **Goal met (item 6).** Two exporters over a `CampaignRun` + `Trend`:
