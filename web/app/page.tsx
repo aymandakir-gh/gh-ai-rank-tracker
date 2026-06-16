@@ -11,6 +11,7 @@
 
 import { useState, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import type { WebScanRequest, WebPromptSpec, WebCompetitor, ScanApiResponse } from '@/lib/types';
 
 // ─── Default prompts ──────────────────────────────────────────────────────────
@@ -122,6 +123,12 @@ export default function HomePage() {
       useDemo,
     };
 
+    posthog.capture('scan_submitted', {
+      is_demo: useDemo,
+      prompt_count: prompts.length,
+      competitor_count: competitors.length,
+    });
+
     setLoading(true);
     try {
       const res = await fetch('/api/scan', {
@@ -136,9 +143,26 @@ export default function HomePage() {
         throw new Error(data.error ?? 'Scan failed');
       }
 
+      posthog.capture('scan_completed', {
+        is_demo: useDemo,
+        visibility_score: data.result.visibilityScore,
+        prompt_count: prompts.length,
+      });
+
+      // OBS-2: demo_used fires when a demo scan completes successfully
+      if (useDemo) {
+        posthog.capture('demo_used', {
+          visibility_score: data.result.visibilityScore,
+        });
+      }
+
       const token = encodeResult(data.result);
       router.push(`/results?r=${encodeURIComponent(token)}`);
     } catch (err) {
+      posthog.capture('scan_error', {
+        is_demo: useDemo,
+        error_message: err instanceof Error ? err.message : 'unknown',
+      });
       setError(err instanceof Error ? err.message : 'Scan failed. Please try again.');
     } finally {
       setLoading(false);

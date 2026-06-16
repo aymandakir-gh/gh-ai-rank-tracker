@@ -20,6 +20,7 @@ import {
   FormEvent,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
+import posthog from 'posthog-js';
 import type { WebScanResult, EmailGateState } from '@/lib/types';
 
 // ─── URL codec ────────────────────────────────────────────────────────────────
@@ -363,6 +364,21 @@ function ResultsContent() {
 
   const [gateState, setGateState] = useState<EmailGateState>('idle');
 
+  // PostHog: fire once when a valid result is decoded
+  // Must be declared before any early return (React hooks rules)
+  useEffect(() => {
+    if (!result) return;
+    posthog.capture('scan_results_viewed', {
+      visibility_score: result.visibilityScore,
+      brand_name: result.brandName,
+    });
+    // OBS-2: score_completed is the canonical required event per observability spec
+    posthog.capture('score_completed', {
+      visibility_score: result.visibilityScore,
+      brand_name: result.brandName,
+    });
+  }, [result]);
+
   const handleShare = useCallback(() => {
     setGateState('modal_open');
   }, []);
@@ -381,6 +397,13 @@ function ResultsContent() {
           visibilityScore: result?.visibilityScore,
         }),
       }).catch(() => {/* intentional fail-open */});
+
+      // OBS-2: lead_captured event (fires regardless of backend status — fail-open)
+      posthog.capture('lead_captured', {
+        brand_name: result?.brandName,
+        visibility_score: result?.visibilityScore,
+        source: 'ai-rank-tracker',
+      });
 
       // Copy URL to clipboard
       try {
@@ -726,7 +749,7 @@ function LoadingFallback() {
   );
 }
 
-// ─── Page export ─────────────────────────────────────────────────────────────
+// ─── Page export ──────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   return (

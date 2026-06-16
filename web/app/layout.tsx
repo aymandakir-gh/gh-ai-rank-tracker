@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { PostHogProvider } from '@/components/PostHogProvider'
 import './globals.css'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gh-ai-rank-tracker.vercel.app'
@@ -46,7 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // lang="en" is the SSR default; LanguageProvider (client) updates it live
     // suppressHydrationWarning prevents React noise when lang/dir change client-side
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   )
 }
