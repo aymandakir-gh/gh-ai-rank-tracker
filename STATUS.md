@@ -1,7 +1,31 @@
-# STATUS
+# STATUS — v1.0.0 🚀
 
 Roadmap v0.5.0 → v1.0.0 is specified in [PRD.md](PRD.md). Newest entries on top.
-v0.4.0 history is in [PLAN.md](PLAN.md).
+v0.4.0 history is in [PLAN.md](PLAN.md). The v1.0 review is in [REVIEW.md](REVIEW.md).
+
+## Release: v1.0.0 ✅ — Launch
+
+All eight goal items shipped across v0.5.0 → v1.0.0, CI green at every tag:
+
+1. **Tracking over time** — `JsonFileStore` (local-first JSON, atomic + serialized
+   writes) + `InMemoryStore` behind a `TrackingStore` interface.
+2. **Prompt sets / campaigns** — `Campaign` + `runCampaign`; share-of-voice
+   aggregated across prompts × engines.
+3. **Competitor comparison** — head-to-head SoV gap, surfaced in CLI + API + web.
+4. **4th engine** — Google **Gemini** adapter (grounding citations) behind an env key.
+5. **Web dashboard** — SoV trend chart, per-engine breakdown, competitor
+   comparison, per-prompt drill-down; i18n (9 locales); self-contained.
+6. **Exportable report** — Markdown + a dependency-free pure-TS **PDF**.
+7. **≥320 real tests** — **439 passing** (engine 296 + 4 skipped, web 143); a
+   reviewer pass confirmed no padding.
+8. **Docs + demo + review** — [METHODOLOGY.md](METHODOLOGY.md), launch README,
+   `docs/demo.tape` + `docs/demo.txt`, packed-build CLI verified, and a
+   multi-agent adversarial review ([REVIEW.md](REVIEW.md)) whose 12 + 4 findings
+   were all fixed with regression tests.
+
+**Release gates (v1.0.0):** typecheck (engine + web) ✓ · CommonJS build ✓ ·
+`next build` ✓ · engine 296✓/4 skip · web 143✓ · concurrent-write fix verified
+on the booted server ✓ · `npm pack` → install → bin + library API verified ✓.
 
 ## Release: v0.9.0 ✅ — Methodology, launch docs & demo
 

@@ -51,4 +51,15 @@ describe('webCampaignToMarkdown', () => {
     })
     expect(md).toContain('a \\| b')
   })
+
+  it('collapses newlines in a prompt so the table row is not split', () => {
+    const md = webCampaignToMarkdown({
+      ...RESULT,
+      prompts: [{ prompt: 'multi\nline | pipe', weight: 1, score: 10, mentions: 0, citations: [] }],
+    })
+    const lines = md.split('\n')
+    const row = lines.find((l) => l.includes('multi line'))
+    expect(row).toMatch(/^\| multi line \\\| pipe \|/)
+    expect(lines.some((l) => l.startsWith('line | pipe'))).toBe(false)
+  })
 })

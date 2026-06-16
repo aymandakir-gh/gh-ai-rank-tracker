@@ -58,6 +58,33 @@ describe("renderCampaignMarkdown", () => {
     expect(md).toContain("top widget tools");
   });
 
+  it("keeps cells/headings on one line when values contain newlines or pipes", async () => {
+    // Regression for the v1 review: escapePipe only escaped '|', so a newline in
+    // a prompt/brand/campaign value split a table row or heading.
+    const run = await runCampaign(
+      {
+        id: "x",
+        name: "X",
+        brand: { name: "Acme\nCorp", domain: "acme.com" },
+        prompts: [{ prompt: "multi\nline | pipe" }],
+        engines: ["e1"],
+      },
+      [new MockProvider({ engine: "e1", script: {} })],
+      { now: FIXED, idFactory: () => "r1" },
+    );
+    const md = renderCampaignMarkdown(run, computeTrend([run]), "Name\nWithBreak");
+    const lines = md.split("\n");
+
+    // Heading: brand newline collapsed → no orphan "Corp" line.
+    expect(lines).toContain("# AI Visibility Report — Acme Corp");
+    expect(lines).toContain("**Campaign:** Name WithBreak");
+    // Prompt cell: newline collapsed to a space, pipe escaped, row intact.
+    const promptRow = lines.find((l) => l.includes("multi line"));
+    expect(promptRow).toMatch(/^\| multi line \\\| pipe \|/);
+    // No stray fragment line beginning with the broken tail.
+    expect(lines.some((l) => l.startsWith("line | pipe"))).toBe(false);
+  });
+
   it("shows the first→last delta line only with multiple runs", async () => {
     const run = await makeRun();
     expect(renderCampaignMarkdown(run, computeTrend([run]))).not.toContain("Since first run");

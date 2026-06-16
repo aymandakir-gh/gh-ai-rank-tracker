@@ -39,6 +39,8 @@ export {
   buildConfigFromUrl,
   buildProviders,
   validateCampaign,
+  resolveClientIp,
+  MAX_CAMPAIGN_PROMPTS,
   InMemoryRateLimiter,
 } from "./api/scan";
 export type {

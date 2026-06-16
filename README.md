@@ -2,7 +2,7 @@
 
 > **Track whether AI answer engines mention and cite your brand.** A GEO / AEO visibility & share-of-voice tracker for the age of ChatGPT, Perplexity, Google AI Overviews and Gemini.
 
-![status](https://img.shields.io/badge/status-v0.4%20live%20adapters-blue) [![CI](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml) ![license](https://img.shields.io/badge/license-MIT-green) ![node](https://img.shields.io/badge/node-%3E%3D20-339933) ![tests](https://img.shields.io/badge/tests-vitest-6E9F18)
+![status](https://img.shields.io/badge/status-v1.0.0-brightgreen) [![CI](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/aymandakir-gh/gh-ai-rank-tracker/actions/workflows/ci.yml) ![license](https://img.shields.io/badge/license-MIT-green) ![node](https://img.shields.io/badge/node-%3E%3D20-339933) ![tests](https://img.shields.io/badge/tests-vitest-6E9F18)
 
 <!-- DEMO PLACEHOLDER — replace with a terminal recording of `npm run demo`.
      See "Recording the demo" below for the vhs / asciinema steps.
@@ -245,7 +245,7 @@ of this README.
 
 ## API
 
-The Hono HTTP API (v0.3) exposes:
+The Hono HTTP API exposes:
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -302,13 +302,17 @@ NODE_ENV=development npm run api:dev
 SCAN_API_KEY=dev-secret npm run api:dev
 ```
 
-For the Next.js web UI (port 3001, proxies to the API):
+The Next.js web UI runs the engine in-process (no separate API server needed)
+and serves on port 3003:
 
 ```bash
 cd web
 npm install
-SCAN_API_URL=http://localhost:3000 npm run dev
+npm run dev          # → http://localhost:3003  (dashboard at /campaign)
 ```
+
+Optional web env vars live in `web/.env.example` (e.g. `LEADS_API_URL` for the
+lead-capture route). The web app does not proxy to the Hono API.
 
 ## Roadmap
 

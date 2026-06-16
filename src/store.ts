@@ -6,9 +6,11 @@
  * ephemeral usage; {@link JsonFileStore} persists to disk with an atomic
  * write-then-rename so a crash mid-write can never corrupt the store.
  *
- * Single-writer assumption: a store instance owns its file. Node is
- * single-threaded, so concurrent async writes on one instance serialize safely;
- * running two processes against the same path is last-writer-wins.
+ * Concurrency: a store instance owns its file. Mutations are serialized through
+ * a per-instance write queue and each flush writes a uniquely-named temp file
+ * before an atomic rename, so concurrent writes on one instance never race on a
+ * shared temp path or corrupt the store. Running two separate processes against
+ * the same path is last-writer-wins (out of scope for a local-first store).
  */
 import { promises as fs } from "node:fs";
 import { dirname } from "node:path";
@@ -91,11 +93,20 @@ export class InMemoryStore implements TrackingStore {
  */
 export class JsonFileStore implements TrackingStore {
   private data: StoreData | null = null;
+  /** Cache the in-flight load so concurrent first-access calls don't double-read. */
+  private loadPromise: Promise<StoreData> | null = null;
+  /** Serializes flushes so concurrent mutations never race on the temp file. */
+  private writeChain: Promise<void> = Promise.resolve();
+  /** Monotonic counter for unique temp filenames. */
+  private writeSeq = 0;
 
   constructor(private readonly path: string) {}
 
-  private async load(): Promise<StoreData> {
-    if (this.data) return this.data;
+  private load(): Promise<StoreData> {
+    return (this.loadPromise ??= this.doLoad());
+  }
+
+  private async doLoad(): Promise<StoreData> {
     try {
       const raw = await fs.readFile(this.path, "utf8");
       const parsed = JSON.parse(raw) as Partial<StoreData>;
@@ -108,16 +119,31 @@ export class JsonFileStore implements TrackingStore {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         this.data = { version: STORE_VERSION, campaigns: [], runs: [] };
       } else {
+        this.loadPromise = null; // allow a retry on a transient read error
         throw err;
       }
     }
     return this.data;
   }
 
-  private async persist(): Promise<void> {
+  /**
+   * Queue a flush of the current in-memory document. Mutations call this instead
+   * of writing directly: each flush is chained after the previous one (so the
+   * temp-file write+rename never interleave) and uses a unique temp name. The
+   * returned promise resolves once *this* mutation's data has been flushed.
+   */
+  private enqueuePersist(): Promise<void> {
+    const run = () => this.flush();
+    // Continue the chain on both success and failure so one failed write does
+    // not wedge every later write.
+    this.writeChain = this.writeChain.then(run, run);
+    return this.writeChain;
+  }
+
+  private async flush(): Promise<void> {
     const data = this.data ?? { version: STORE_VERSION, campaigns: [], runs: [] };
     await fs.mkdir(dirname(this.path), { recursive: true });
-    const tmp = `${this.path}.tmp`;
+    const tmp = `${this.path}.${process.pid}.${this.writeSeq++}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
     await fs.rename(tmp, this.path); // atomic on POSIX + Windows
   }
@@ -127,7 +153,7 @@ export class JsonFileStore implements TrackingStore {
     const i = data.campaigns.findIndex((c) => c.id === campaign.id);
     if (i >= 0) data.campaigns[i] = campaign;
     else data.campaigns.push(campaign);
-    await this.persist();
+    await this.enqueuePersist();
   }
 
   async listCampaigns(): Promise<Campaign[]> {
@@ -147,7 +173,7 @@ export class JsonFileStore implements TrackingStore {
     );
     if (i >= 0) data.runs[i] = run;
     else data.runs.push(run);
-    await this.persist();
+    await this.enqueuePersist();
   }
 
   async getRuns(campaignId: string): Promise<CampaignRun[]> {

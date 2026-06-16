@@ -55,6 +55,20 @@ describe("detectMention", () => {
     expect(detectMention("", GH).mentioned).toBe(false);
     expect(detectMention("anything", { name: "" }).mentioned).toBe(false);
   });
+
+  it("does not double-count when one term is a sub-token of another (overlap merge)", () => {
+    // Regression for the v1 review: name "Cal" + alias "Cal.com" both matched
+    // the same "Cal.com" span (the '.' is a token boundary), inflating count.
+    const r = detectMention("Cal.com is a scheduling tool.", { name: "Cal", aliases: ["Cal.com"] });
+    expect(r.mentioned).toBe(true);
+    expect(r.count).toBe(1); // one occurrence, not two
+    expect(r.matchedTerms).toEqual(expect.arrayContaining(["Cal", "Cal.com"]));
+  });
+
+  it("still counts genuinely separate occurrences across aliases", () => {
+    const r = detectMention("Acme wins. Later, ACME Inc also.", { name: "Acme", aliases: ["ACME Inc"] });
+    expect(r.count).toBe(2); // "Acme" + "ACME Inc" are distinct, non-overlapping spans
+  });
 });
 
 describe("normalizeDomain", () => {

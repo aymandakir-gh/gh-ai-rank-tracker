@@ -165,16 +165,27 @@ describe('EmailGateModal — email validation', () => {
     expect(screen.getByLabelText(/work email/i)).toHaveAttribute('aria-invalid', 'true')
   })
 
-  test('valid format clears fieldError on next submit attempt', async () => {
+  test('recovers from a validation error and completes a successful submit', async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
+    global.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }))
+
     await clickShare()
-    // First submit with bad email to trigger error
+    // First submit with a bad email → validation alert appears (real branch).
     await userEvent.click(screen.getByRole('button', { name: /copy share link/i }))
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-    // Fix email value
+    expect(screen.getByRole('alert')).toHaveTextContent(/valid email/i)
+
+    // Fix the value and resubmit → the flow advances out of the error state to
+    // success (the validation alert is no longer present).
     const input = screen.getByLabelText(/work email/i)
     await userEvent.clear(input)
-    // Error should persist until next submit attempt — just verifying no crash
-    expect(input).toBeInTheDocument()
+    await userEvent.type(input, 'good@example.com')
+    await userEvent.click(screen.getByRole('button', { name: /copy share link/i }))
+
+    await waitFor(() => expect(screen.getByText(/link copied/i)).toBeInTheDocument())
+    expect(screen.queryByRole('alert')).toBeNull()
+    vi.restoreAllMocks()
   })
 })
 

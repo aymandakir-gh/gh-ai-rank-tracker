@@ -16,8 +16,18 @@ function signed(n: number): string {
   return `${n >= 0 ? "+" : ""}${n}`;
 }
 
-function escapePipe(s: string): string {
-  return s.replace(/\|/g, "\\|");
+/**
+ * Make an untrusted string safe inside a Markdown table cell: escape backslash
+ * *first* (so a literal `\|` doesn't become `\\|`), then the pipe, then collapse
+ * any line break to a space (a raw newline would terminate the table row early).
+ */
+function escapeCell(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+}
+
+/** Collapse line breaks for an inline (heading / bold) interpolation. */
+function inline(s: string): string {
+  return s.replace(/[\r\n]+/g, " ");
 }
 
 /** Render a campaign run + trend as a Markdown report. */
@@ -29,9 +39,9 @@ export function renderCampaignMarkdown(
   const name = campaignName ?? run.campaignId;
   const L: string[] = [];
 
-  L.push(`# AI Visibility Report — ${run.brand}`);
+  L.push(`# AI Visibility Report — ${inline(run.brand)}`);
   L.push("");
-  L.push(`**Campaign:** ${name}`);
+  L.push(`**Campaign:** ${inline(name)}`);
   L.push(`**Generated:** ${run.generatedAt}`);
   L.push(`**AI Visibility Score:** ${run.visibilityScore}/100`);
   if (trend.points.length > 1) {
@@ -58,7 +68,7 @@ export function renderCampaignMarkdown(
   L.push("| Engine | Score | Mention rate | Citation rate |");
   L.push("|---|---:|---:|---:|");
   for (const e of run.engineBreakdown) {
-    L.push(`| ${escapePipe(e.engine)} | ${e.score}/100 | ${pct01(e.mentionRate)} | ${pct01(e.citationRate)} |`);
+    L.push(`| ${escapeCell(e.engine)} | ${e.score}/100 | ${pct01(e.mentionRate)} | ${pct01(e.citationRate)} |`);
   }
   L.push("");
 
@@ -71,7 +81,7 @@ export function renderCampaignMarkdown(
     for (const c of run.competitorComparison) {
       const label = c.isTracked ? `${c.brand} (you)` : c.brand;
       const gap = c.isTracked ? "—" : `${signed(Math.round(c.gapVsTracked * 100))}%`;
-      L.push(`| ${escapePipe(label)} | ${pct01(c.shareOfVoice)} | ${gap} |`);
+      L.push(`| ${escapeCell(label)} | ${pct01(c.shareOfVoice)} | ${gap} |`);
     }
     L.push("");
   }
@@ -83,7 +93,7 @@ export function renderCampaignMarkdown(
   L.push("|---|---:|---:|:---:|:---:|");
   for (const p of run.report.prompts) {
     L.push(
-      `| ${escapePipe(p.prompt)} | ${p.weight} | ${p.score}/100 | ` +
+      `| ${escapeCell(p.prompt)} | ${p.weight} | ${p.score}/100 | ` +
         `${p.mentionedAnywhere ? "yes" : "—"} | ${p.citedAnywhere ? "yes" : "—"} |`,
     );
   }
@@ -94,7 +104,7 @@ export function renderCampaignMarkdown(
     L.push("## Recommendations");
     L.push("");
     for (const r of run.report.recommendations) {
-      L.push(`- **[${r.severity.toUpperCase()}]** ${r.message}`);
+      L.push(`- **[${r.severity.toUpperCase()}]** ${inline(r.message)}`);
     }
     L.push("");
   }

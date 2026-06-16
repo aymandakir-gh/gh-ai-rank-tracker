@@ -47,6 +47,21 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+/**
+ * Resolve the client IP for rate-limiting from X-Forwarded-For. The header is
+ * client-controllable on the left; a trusted proxy appends the real client on
+ * the right — so we read the right-most entry, which resists the leftmost-spoof
+ * bypass. Best-effort: this in-memory limiter assumes a single trusted proxy
+ * (e.g. Railway) sets X-Forwarded-For and resets on cold start.
+ */
+function clientIp(req: NextRequest): string {
+  const parts = (req.headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] ?? 'unknown';
+}
+
 // ─── Zod schema (custom campaigns) ──────────────────────────────────────────────
 const CampaignSchema = z.object({
   name: z.string().min(1).max(120).optional(),
@@ -113,7 +128,7 @@ async function buildDemoHistory(): Promise<{
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse<CampaignApiResponse>> {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+  const ip = clientIp(req);
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { ok: false, error: 'Rate limit exceeded. Try again in a few minutes.' },

@@ -9,8 +9,9 @@ function signed(n: number): string {
   return `${n >= 0 ? '+' : ''}${n}`;
 }
 
+/** Escape a string for a Markdown table cell: backslash, then pipe, then collapse line breaks. */
 function escapePipe(s: string): string {
-  return s.replace(/\|/g, '\\|');
+  return s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' ');
 }
 
 export function webCampaignToMarkdown(r: WebCampaignResult): string {

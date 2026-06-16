@@ -3,8 +3,8 @@
  *
  * POST /api/scan accepts a brand URL + provider list, runs a full tracking
  * pass through the requested AI-engine providers, and returns a TrackingReport
- * as JSON. Input is screened by the Aegis guard (prompt injection + jailbreak)
- * before any business logic executes.
+ * as JSON. When enabled (AEGIS_ENABLED), input is screened by the Aegis guard
+ * (prompt injection + jailbreak) before any business logic executes.
  *
  * GET /health returns { ok: true, version, ts } — used by Railway healthcheck.
  *
@@ -19,6 +19,7 @@
 
 import { timingSafeEqual } from "crypto";
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { runTracking } from "../tracker";
 import { MockProvider, type AnswerEngineProvider } from "../providers";
 import { PerplexityProvider } from "../providers/perplexity";
@@ -32,7 +33,7 @@ import { InMemoryStore, type TrackingStore } from "../store";
 import { demoConfig, demoCampaign, demoProviders } from "../demo";
 import { createAegisGuard, type AegisGuard } from "../aegis";
 
-const VERSION = "0.9.0";
+const VERSION = "1.0.0";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -181,6 +182,15 @@ export interface AppOptions {
    * entrypoint injects a JsonFileStore for real local-first persistence.
    */
   store?: TrackingStore;
+  /**
+   * Number of trusted reverse proxies in front of the app (default
+   * `TRUSTED_PROXY_HOPS` env or 1). The rate-limit client IP is read this many
+   * hops from the RIGHT of X-Forwarded-For — the entry the nearest trusted proxy
+   * appended — which resists the trivial leftmost-spoof bypass.
+   */
+  proxyHops?: number;
+  /** Max accepted request body size in bytes (default 256 KB). */
+  maxBodyBytes?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -290,6 +300,9 @@ export function validateCampaign(input: unknown): { campaign: Campaign } | { err
   if (!Array.isArray(prompts) || prompts.length === 0) {
     return { error: "campaign.prompts must be a non-empty array" };
   }
+  if (prompts.length > MAX_CAMPAIGN_PROMPTS) {
+    return { error: `campaign.prompts exceeds the maximum of ${MAX_CAMPAIGN_PROMPTS}` };
+  }
   const normPrompts = [];
   for (const p of prompts) {
     if (typeof p === "object" && p !== null && typeof (p as Record<string, unknown>)["prompt"] === "string") {
@@ -313,6 +326,44 @@ export function validateCampaign(input: unknown): { campaign: Campaign } | { err
   return { campaign };
 }
 
+/** Hard cap on prompts per campaign — bounds request size + outbound LLM fan-out. */
+export const MAX_CAMPAIGN_PROMPTS = 50;
+
+/** Default max accepted request body size (256 KB). */
+export const DEFAULT_MAX_BODY_BYTES = 256 * 1024;
+
+/**
+ * Resolve the rate-limit client IP from an `X-Forwarded-For` value.
+ *
+ * X-Forwarded-For is client-controllable on the LEFT; trusted reverse proxies
+ * append the real client on the RIGHT. Reading the entry `proxyHops` from the
+ * right (default 1 = a single trusted proxy, e.g. Railway) resists the trivial
+ * leftmost-spoof rate-limit bypass. Returns "unknown" when the header is empty
+ * (do not trust XFF without a proxy in front).
+ */
+export function resolveClientIp(xff: string, proxyHops = 1): string {
+  const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) return "unknown";
+  const hops = Math.max(1, Math.floor(proxyHops));
+  return parts[Math.max(0, parts.length - hops)] ?? "unknown";
+}
+
+/**
+ * Client-safe message for a provider-build failure: keep genuine input mistakes
+ * ("Unknown provider: …"), but never echo server config details (e.g. which API
+ * keys are/aren't set) — OWASP A03 info exposure.
+ */
+function providerBuildMessage(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /^Unknown provider/.test(msg) ? msg : "Requested provider is not available on this server.";
+}
+
+/** Log the real error server-side and return a generic message to the caller. */
+function safeRunError(err: unknown, fallback: string): string {
+  console.error("[gh-ai-rank-tracker]", err);
+  return fallback;
+}
+
 // ─── App factory ─────────────────────────────────────────────────────────────
 
 /**
@@ -326,7 +377,22 @@ export function createApp(opts: AppOptions = {}) {
   const limiter: RateLimiter = opts.rateLimiter ?? new InMemoryRateLimiter();
   const aegis: AegisGuard = opts.aegisGuard ?? createAegisGuard();
   const store: TrackingStore = opts.store ?? new InMemoryStore();
+  const proxyHops = opts.proxyHops ?? (Number(process.env["TRUSTED_PROXY_HOPS"]) || 1);
+  const maxBodyBytes = opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const app = new Hono();
+
+  /** Reject oversized bodies up front via the Content-Length header (fast path). */
+  function tooLarge(c: Context): boolean {
+    const len = Number(c.req.header("content-length") ?? "0");
+    return Number.isFinite(len) && len > maxBodyBytes;
+  }
+
+  // Streamed body-size enforcement (catches chunked / understated-Content-Length
+  // clients that the header fast-path above can't see).
+  const limit = bodyLimit({
+    maxSize: maxBodyBytes,
+    onError: (c) => c.json({ ok: false, error: "Request body too large" }, 413),
+  });
 
   /**
    * Shared auth + rate-limit gate. Returns a JSON Response to short-circuit
@@ -342,8 +408,7 @@ export function createApp(opts: AppOptions = {}) {
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
       if (!safeCompare(token, apiKey)) return c.json(make("Unauthorized"), 401);
     }
-    const forwarded = c.req.header("x-forwarded-for") ?? "";
-    const ip = forwarded.split(",")[0]?.trim() || "unknown";
+    const ip = resolveClientIp(c.req.header("x-forwarded-for") ?? "", proxyHops);
     if (!limiter.check(ip)) {
       return c.json(make("Rate limit exceeded. Max 10 requests per minute."), 429);
     }
@@ -356,7 +421,7 @@ export function createApp(opts: AppOptions = {}) {
     return c.json({ ok: true, version: VERSION, ts: Date.now() });
   });
 
-  app.post("/api/scan", async (c) => {
+  app.post("/api/scan", limit, async (c) => {
     // ── 1. Auth ───────────────────────────────────────────────────────────────
     if (apiKey) {
       const authHeader = c.req.header("Authorization") ?? "";
@@ -367,13 +432,17 @@ export function createApp(opts: AppOptions = {}) {
     }
 
     // ── 2. Rate limit ─────────────────────────────────────────────────────────
-    const forwarded = c.req.header("x-forwarded-for") ?? "";
-    const ip = forwarded.split(",")[0]?.trim() || "unknown";
+    const ip = resolveClientIp(c.req.header("x-forwarded-for") ?? "", proxyHops);
     if (!limiter.check(ip)) {
       return c.json(
         { ok: false, error: "Rate limit exceeded. Max 10 requests per minute." } satisfies ScanResponse,
         429,
       );
+    }
+
+    // ── 2b. Body-size guard ─────────────────────────────────────────────────────
+    if (tooLarge(c)) {
+      return c.json({ ok: false, error: "Request body too large" } satisfies ScanResponse, 413);
     }
 
     // ── 3. Parse + validate body ──────────────────────────────────────────────
@@ -440,7 +509,7 @@ export function createApp(opts: AppOptions = {}) {
       providerInstances = buildProviders(providerNames);
     } catch (err) {
       return c.json(
-        { ok: false, error: err instanceof Error ? err.message : String(err) } satisfies ScanResponse,
+        { ok: false, error: providerBuildMessage(err) } satisfies ScanResponse,
         400,
       );
     }
@@ -451,7 +520,7 @@ export function createApp(opts: AppOptions = {}) {
       return c.json({ ok: true, result } satisfies ScanResponse);
     } catch (err) {
       return c.json(
-        { ok: false, error: err instanceof Error ? err.message : "Scan failed" } satisfies ScanResponse,
+        { ok: false, error: safeRunError(err, "Scan failed") } satisfies ScanResponse,
         500,
       );
     }
@@ -462,9 +531,10 @@ export function createApp(opts: AppOptions = {}) {
   // return the run plus the full history + trend. Same auth + rate-limit gate.
   const campaignErr = (error: string): CampaignResponse => ({ ok: false, error });
 
-  app.post("/api/campaign", async (c) => {
+  app.post("/api/campaign", limit, async (c) => {
     const blocked = gate(c, campaignErr);
     if (blocked) return blocked;
+    if (tooLarge(c)) return c.json(campaignErr("Request body too large"), 413);
 
     let body: unknown;
     try {
@@ -488,11 +558,14 @@ export function createApp(opts: AppOptions = {}) {
       if ("error" in validated) return c.json(campaignErr(validated.error), 400);
       campaign = validated.campaign;
 
-      // Screen the campaign's free-text inputs before any provider call.
-      const probe = [campaign.brand.name, ...campaign.prompts.map((p) => p.prompt)].join("\n");
-      const aegisResult = await aegis.scan(probe, { scope: "input" });
-      if (!aegisResult.safe) {
-        return c.json(campaignErr(`Input blocked: ${aegisResult.threatType ?? "UNKNOWN_THREAT"}`), 400);
+      // Screen each free-text input independently before any provider call.
+      // Scanning per-field (not one joined string) avoids the guard's input
+      // truncation hiding injection content placed after earlier prompts.
+      for (const probe of [campaign.brand.name, ...campaign.prompts.map((p) => p.prompt)]) {
+        const r = await aegis.scan(probe, { scope: "input" });
+        if (!r.safe) {
+          return c.json(campaignErr(`Input blocked: ${r.threatType ?? "UNKNOWN_THREAT"}`), 400);
+        }
       }
 
       const providersField = raw["providers"];
@@ -502,7 +575,7 @@ export function createApp(opts: AppOptions = {}) {
       try {
         providerInstances = buildProviders(names);
       } catch (err) {
-        return c.json(campaignErr(err instanceof Error ? err.message : String(err)), 400);
+        return c.json(campaignErr(providerBuildMessage(err)), 400);
       }
     }
 
@@ -513,7 +586,7 @@ export function createApp(opts: AppOptions = {}) {
       const history = await store.getRuns(campaign.id);
       return c.json({ ok: true, run, history, trend: computeTrend(history) } satisfies CampaignResponse);
     } catch (err) {
-      return c.json(campaignErr(err instanceof Error ? err.message : "Campaign run failed"), 500);
+      return c.json(campaignErr(safeRunError(err, "Campaign run failed")), 500);
     }
   });
 

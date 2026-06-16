@@ -4,14 +4,20 @@ function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
 }
 
+/** Escape a string for a Markdown table cell (backslash, then pipe, then collapse line breaks). */
 function escapePipe(s: string): string {
-  return s.replace(/\|/g, "\\|");
+  return s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+}
+
+/** Collapse line breaks for an inline (heading / list / bold) interpolation. */
+function inline(s: string): string {
+  return s.replace(/[\r\n]+/g, " ");
 }
 
 /** Render a tracking report as Markdown (suitable for a repo, doc or email). */
 export function renderMarkdown(r: TrackingReport): string {
   const lines: string[] = [];
-  lines.push(`# AI Visibility Report — ${r.brand}`);
+  lines.push(`# AI Visibility Report — ${inline(r.brand)}`);
   lines.push("");
   lines.push(`**AI Visibility Score:** ${r.visibilityScore}/100`);
   lines.push(`**Generated:** ${r.generatedAt}`);
@@ -51,14 +57,14 @@ export function renderMarkdown(r: TrackingReport): string {
   if (r.gaps.length) {
     lines.push("## Visibility gaps (no mention in any engine)");
     lines.push("");
-    for (const g of r.gaps) lines.push(`- ${g}`);
+    for (const g of r.gaps) lines.push(`- ${inline(g)}`);
     lines.push("");
   }
 
   lines.push("## Recommendations");
   lines.push("");
   for (const rec of r.recommendations) {
-    lines.push(`- **[${rec.severity.toUpperCase()}]** ${rec.message}`);
+    lines.push(`- **[${rec.severity.toUpperCase()}]** ${inline(rec.message)}`);
   }
   lines.push("");
 

@@ -52,27 +52,44 @@ export function detectMention(text: string, brand: Brand): MentionResult {
     return { mentioned: false, count: 0, firstIndex: -1, prominence: 0, matchedTerms: [] };
   }
 
-  let count = 0;
-  let firstIndex = -1;
+  // Collect every match span across all terms, then count *distinct*
+  // occurrences by merging overlapping spans. This prevents double-counting
+  // when one term is a punctuation-bounded sub-token of another
+  // (e.g. name "Cal" + alias "Cal.com" both match the same "Cal.com" span).
+  const spans: Array<[number, number]> = [];
   const matched = new Set<string>();
-
   for (const term of terms) {
     const re = termRegex(term);
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
-      count++;
+      spans.push([m.index, m.index + m[0].length]);
       matched.add(term);
-      if (firstIndex === -1 || m.index < firstIndex) firstIndex = m.index;
       if (m.index === re.lastIndex) re.lastIndex++; // guard against zero-length loops
     }
   }
 
-  const mentioned = count > 0;
+  if (spans.length === 0) {
+    return { mentioned: false, count: 0, firstIndex: -1, prominence: 0, matchedTerms: [] };
+  }
+
+  spans.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  const firstIndex = spans[0]![0];
+  let count = 0;
+  let mergedEnd = -1;
+  for (const [start, end] of spans) {
+    if (start >= mergedEnd) {
+      count++; // a new, non-overlapping occurrence
+      mergedEnd = end;
+    } else if (end > mergedEnd) {
+      mergedEnd = end; // overlaps the current span → extend, do not re-count
+    }
+  }
+
   return {
-    mentioned,
+    mentioned: true,
     count,
     firstIndex,
-    prominence: mentioned ? computeProminence(firstIndex, text.length) : 0,
+    prominence: computeProminence(firstIndex, text.length),
     matchedTerms: [...matched],
   };
 }

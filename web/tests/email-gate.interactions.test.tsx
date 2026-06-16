@@ -147,16 +147,20 @@ describe('EmailGate — interactions', () => {
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
   })
 
-  // ── (6) onSuccess with trimmed email ────────────────────────────────────────
+  // ── (6) onSuccess fires once with the submitted email ────────────────────────
 
-  it('calls onSuccess with the trimmed email after successful submission', async () => {
+  it('calls onSuccess exactly once with the entered email on a successful submit', async () => {
+    // NOTE: trimming is NOT asserted here — `<input type="email">` strips
+    // surrounding whitespace in the browser/jsdom before it reaches state, so
+    // the component's defensive .trim() is unobservable at this layer. The
+    // trim-before-validate behaviour is covered where it is observable: the
+    // lead route's zod `.trim().email()` (see lead-route.test.ts).
     mockFetch(true)
     const onSuccess = vi.fn()
 
     renderGate({ onSuccess })
     const user = userEvent.setup()
 
-    // The input trims on submit — trailing/leading whitespace is stripped.
     await user.type(screen.getByLabelText('Email address'), 'user@example.com')
     await user.click(screen.getByRole('button', { name: /send me the full report/i }))
 

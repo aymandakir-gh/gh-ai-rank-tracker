@@ -131,6 +131,24 @@ describe("JsonFileStore", () => {
     expect(await store.listCampaigns()).toEqual([]);
     expect(await store.getRuns("c1")).toEqual([]);
   });
+
+  it("handles many concurrent writes on one instance without ENOENT (serialized flushes)", async () => {
+    // Regression for the v1 review: persist() used a shared `${path}.tmp`, so
+    // concurrent renames raced and all-but-one rejected with ENOENT.
+    const store = new JsonFileStore(path);
+    const runs = Array.from({ length: 25 }, (_, i) =>
+      makeRun(`r${i}`, `2026-06-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`, i),
+    );
+    // None of these should reject.
+    await Promise.all(runs.map((r) => store.recordRun(r)));
+
+    expect(await store.getRuns("c1")).toHaveLength(25);
+    // And the persisted file (read by a fresh instance) holds every run.
+    const fresh = new JsonFileStore(path);
+    expect(await fresh.getRuns("c1")).toHaveLength(25);
+    // The on-disk JSON is valid (last flush won, not a half-written file).
+    expect(JSON.parse(await fs.readFile(path, "utf8")).runs).toHaveLength(25);
+  });
 });
 
 describe("store factory", () => {
