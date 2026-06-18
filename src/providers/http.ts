@@ -22,10 +22,15 @@ export interface RetryOptions {
   baseDelayMs: number;
 }
 
-/** True for an error carrying an HTTP status in the 4xx range (deterministic — don't retry). */
+/**
+ * True for an error carrying a deterministic 4xx HTTP status — retrying cannot
+ * help, so it propagates immediately. 429 (Too Many Requests) is excluded: it is
+ * transient and exponential backoff is exactly the right response, so it falls
+ * through to the retry path instead of failing the whole engine on a blip.
+ */
 function isClientError(err: unknown): boolean {
   const status = (err as { status?: unknown }).status;
-  return typeof status === "number" && status >= 400 && status < 500;
+  return typeof status === "number" && status >= 400 && status < 500 && status !== 429;
 }
 
 /**
