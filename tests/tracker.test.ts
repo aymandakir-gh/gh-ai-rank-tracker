@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { runTracking, buildRecommendations } from "../src/tracker";
-import { MockProvider } from "../src/providers";
+import { MockProvider, type AnswerEngineProvider } from "../src/providers";
 import { demoConfig, demoProviders } from "../src/demo";
 import type { TrackingConfig } from "../src/types";
 
@@ -87,5 +87,42 @@ describe("buildRecommendations", () => {
       ],
     );
     expect(recs.some((r) => /Rival leads share-of-voice/.test(r.message))).toBe(true);
+  });
+});
+
+describe("runTracking (partial provider failure)", () => {
+  const config: TrackingConfig = {
+    brand: { name: "Acme", domain: "acme.com" },
+    prompts: [{ prompt: "best widget vendor" }],
+  };
+  const working = () =>
+    new MockProvider({
+      engine: "perplexity",
+      script: {
+        "best widget vendor": {
+          text: "Acme is the best widget vendor by far.",
+          citations: [{ url: "https://acme.com" }],
+        },
+      },
+    });
+  const failing = (engine: string): AnswerEngineProvider => ({
+    engine,
+    query: async () => {
+      throw new Error("upstream down");
+    },
+  });
+
+  it("keeps the engines that succeeded when one provider fails (not all-or-nothing)", async () => {
+    const report = await runTracking(config, [working(), failing("chatgpt")], { now: FIXED });
+    // The working engine's result survived a sibling failure...
+    expect(report.visibilityScore).toBeGreaterThan(0);
+    // ...and only the successful engine contributed a response.
+    expect(report.prompts[0].byEngine).toHaveLength(1);
+  });
+
+  it("throws only when every provider fails", async () => {
+    await expect(
+      runTracking(config, [failing("perplexity"), failing("chatgpt")], { now: FIXED }),
+    ).rejects.toThrow(/every provider query failed/);
   });
 });
