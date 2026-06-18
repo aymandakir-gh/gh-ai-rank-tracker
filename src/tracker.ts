@@ -46,9 +46,23 @@ export async function runTracking(
 
   for (const spec of config.prompts) {
     const weight = spec.weight ?? 1;
-    const responses = await Promise.all(providers.map((p) => p.query(spec.prompt)));
+    // Tolerate partial failures: one provider erroring (timeout, persistent 5xx,
+    // …) must not discard the engines that did answer. Promise.all would reject
+    // the entire run on the first failure; allSettled keeps the rest.
+    const settled = await Promise.allSettled(providers.map((p) => p.query(spec.prompt)));
+    const responses = settled
+      .filter((r): r is PromiseFulfilledResult<EngineResponse> => r.status === "fulfilled")
+      .map((r) => r.value);
     allResponses.push(...responses);
     promptScores.push(aggregatePrompt(spec.prompt, weight, responses, config.brand, weights));
+  }
+
+  // A run where every provider failed for every prompt has no data — surface
+  // that as an error rather than emitting a misleading all-zero report.
+  if (allResponses.length === 0) {
+    throw new Error(
+      "runTracking: every provider query failed — no engine returned a response",
+    );
   }
 
   const brands: Brand[] = [config.brand, ...(config.competitors ?? [])];
