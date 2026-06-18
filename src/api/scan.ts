@@ -315,11 +315,33 @@ export function validateCampaign(input: unknown): { campaign: Campaign } | { err
     }
   }
 
+  // Validate competitors like the brand: each must carry a non-empty name.
+  // Previously any array was accepted as-is, so a malformed competitor (e.g.
+  // {} or a bare string) passed validation and only blew up later — surfacing
+  // as a 500 instead of a clean 400.
+  let competitors: Campaign["competitors"];
+  const rawCompetitors = c["competitors"];
+  if (rawCompetitors !== undefined) {
+    if (!Array.isArray(rawCompetitors)) {
+      return { error: "campaign.competitors must be an array" };
+    }
+    for (const comp of rawCompetitors) {
+      const name =
+        typeof comp === "object" && comp !== null
+          ? (comp as Record<string, unknown>)["name"]
+          : undefined;
+      if (typeof name !== "string" || !name.trim()) {
+        return { error: "each campaign.competitor requires a non-empty name" };
+      }
+    }
+    competitors = rawCompetitors as Campaign["competitors"];
+  }
+
   const campaign: Campaign = {
     id: c["id"] as string,
     name: c["name"] as string,
     brand: brand as Campaign["brand"],
-    competitors: Array.isArray(c["competitors"]) ? (c["competitors"] as Campaign["competitors"]) : undefined,
+    competitors,
     prompts: normPrompts,
     engines: Array.isArray(c["engines"]) ? (c["engines"] as string[]) : undefined,
   };
