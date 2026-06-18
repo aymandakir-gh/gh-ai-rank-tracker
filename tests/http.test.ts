@@ -53,6 +53,22 @@ describe("withRetry", () => {
     // 1 initial attempt + 2 retries
     expect(attempt).toHaveBeenCalledTimes(3);
   });
+
+  it("retries a 429 (rate limit) — it is transient, not a deterministic 4xx", async () => {
+    const attempt = vi
+      .fn()
+      .mockRejectedValueOnce(new StatusError("rate limited", 429))
+      .mockResolvedValueOnce("ok");
+    await expect(withRetry(attempt, FAST)).resolves.toBe("ok");
+    expect(attempt).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry a 403 (still a deterministic 4xx)", async () => {
+    const err = new StatusError("forbidden", 403);
+    const attempt = vi.fn().mockRejectedValue(err);
+    await expect(withRetry(attempt, FAST)).rejects.toBe(err);
+    expect(attempt).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("fetchWithTimeout", () => {
