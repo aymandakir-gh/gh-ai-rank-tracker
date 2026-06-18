@@ -49,3 +49,50 @@ export async function withRetry<T>(
   }
   throw lastError ?? new Error("withRetry: max retries exhausted");
 }
+
+/** Default per-request timeout (ms) for live provider calls. */
+export const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
+ * Thrown when a live provider request exceeds its timeout. Carries no `status`,
+ * so {@link withRetry} treats it as a transient failure and retries it — which
+ * bounds total wall-clock to (timeout + backoff) × attempts instead of hanging
+ * forever on an upstream that accepts the connection but never responds.
+ */
+export class HttpTimeoutError extends Error {
+  constructor(
+    public readonly timeoutMs: number,
+    public readonly url: string,
+  ) {
+    super(`Request to ${url} timed out after ${timeoutMs}ms`);
+    this.name = "HttpTimeoutError";
+  }
+}
+
+/**
+ * `fetch` with an AbortController-based timeout. Without this a hung upstream
+ * (TCP connected, no response) stalls a scan indefinitely — `withRetry` can't
+ * help because a hang never throws. A non-positive / non-finite `timeoutMs`
+ * disables the timeout. The injected `fetchFn` is used as-is so VCR-style test
+ * fetches keep working; a real abort surfaces as {@link HttpTimeoutError}.
+ */
+export async function fetchWithTimeout(
+  fetchFn: typeof globalThis.fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return fetchFn(url, init);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchFn(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) throw new HttpTimeoutError(timeoutMs, url);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
