@@ -77,6 +77,14 @@ describe("normalizeDomain", () => {
     expect(normalizeDomain("http://example.com:8080/path")).toBe("example.com");
     expect(normalizeDomain("growthackers.io")).toBe("growthackers.io");
   });
+
+  it("strips userinfo (user@ and user:pass@) before the host", () => {
+    expect(normalizeDomain("https://user@acme.com/blog")).toBe("acme.com");
+    expect(normalizeDomain("https://user:pw@acme.com")).toBe("acme.com");
+    expect(normalizeDomain("https://news@www.acme.com:443/x")).toBe("acme.com");
+    // an '@' inside the path must NOT be treated as userinfo
+    expect(normalizeDomain("acme.com/u@handle")).toBe("acme.com");
+  });
 });
 
 describe("detectCitation", () => {
@@ -88,6 +96,12 @@ describe("detectCitation", () => {
     expect(r.cited).toBe(true);
     expect(r.rank).toBe(2);
     expect(r.count).toBe(1);
+  });
+
+  it("matches a brand-domain citation that carries userinfo", () => {
+    const r = detectCitation([{ url: "https://ref:tok@growthackers.io/blog" }], GH);
+    expect(r.cited).toBe(true);
+    expect(r.rank).toBe(1);
   });
 
   it("matches subdomains of the brand domain", () => {
