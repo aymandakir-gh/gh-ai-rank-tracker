@@ -81,6 +81,51 @@ describe("campaign prompt-count cap", () => {
     expect("campaign" in r).toBe(true);
   });
 
+  it("rejects a competitor without a name (400, not a later 500)", () => {
+    const r = validateCampaign({
+      id: "c",
+      name: "C",
+      brand: { name: "A" },
+      prompts: [{ prompt: "p" }],
+      competitors: [{ name: "Rival" }, { domain: "x.com" }], // 2nd lacks a name
+    });
+    expect("error" in r).toBe(true);
+    if ("error" in r) expect(r.error).toMatch(/competitor requires a non-empty name/);
+  });
+
+  it("rejects non-array competitors", () => {
+    const r = validateCampaign({
+      id: "c",
+      name: "C",
+      brand: { name: "A" },
+      prompts: [{ prompt: "p" }],
+      competitors: "Rival",
+    });
+    expect("error" in r).toBe(true);
+  });
+
+  it("accepts valid competitors and treats omitted competitors as undefined", () => {
+    const withComp = validateCampaign({
+      id: "c",
+      name: "C",
+      brand: { name: "A" },
+      prompts: [{ prompt: "p" }],
+      competitors: [{ name: "Rival", domain: "rival.com" }],
+    });
+    expect("campaign" in withComp).toBe(true);
+    const none = validateCampaign({ id: "c", name: "C", brand: { name: "A" }, prompts: [{ prompt: "p" }] });
+    expect("campaign" in none).toBe(true);
+    if ("campaign" in none) expect(none.campaign.competitors).toBeUndefined();
+  });
+
+  it("POST /api/campaign returns 400 (not 500) for a malformed competitor", async () => {
+    const app = openApp({ rateLimiter: allowAll });
+    const res = await app.request(
+      postCampaign({ campaign: { id: "c", name: "C", brand: { name: "A" }, prompts: [{ prompt: "p" }], competitors: [{}] } }),
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("POST /api/campaign returns 400 for an over-cap prompt set", async () => {
     const app = openApp({ rateLimiter: allowAll });
     const prompts = Array.from({ length: MAX_CAMPAIGN_PROMPTS + 5 }, (_, i) => ({ prompt: `p${i}` }));
