@@ -99,6 +99,7 @@ export function normalizeDomain(input: string): string {
   if (!input) return "";
   let s = input.trim().toLowerCase();
   s = s.replace(/^[a-z]+:\/\//, ""); // strip scheme
+  s = s.replace(/^[^@/]*@/, ""); // strip userinfo (user@ / user:pass@) before the host
   s = s.replace(/^www\./, "");
   s = s.split("/")[0]!; // drop path
   s = s.split("?")[0]!; // drop query
