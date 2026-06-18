@@ -1,6 +1,6 @@
 import type { AnswerEngineProvider } from "../providers";
 import type { Citation, EngineResponse } from "../types";
-import { withRetry } from "./http";
+import { fetchWithTimeout, withRetry } from "./http";
 
 export interface PerplexityOptions {
   /** Perplexity API key. Defaults to process.env.PERPLEXITY_API_KEY. */
@@ -11,6 +11,8 @@ export interface PerplexityOptions {
   maxRetries?: number;
   /** Base delay ms for exponential backoff (1 s → 2 s → 4 s). Default: 1000. */
   baseDelayMs?: number;
+  /** Per-request timeout in ms (AbortController). Default: 60_000. Set <=0 to disable. */
+  timeoutMs?: number;
   /**
    * Injectable fetch for VCR-style testing.
    * When provided, the provider never makes a real HTTP call.
@@ -77,6 +79,7 @@ export class PerplexityProvider implements AnswerEngineProvider {
   private readonly model: string;
   private readonly maxRetries: number;
   private readonly baseDelayMs: number;
+  private readonly timeoutMs?: number;
   private readonly fetchFn: typeof globalThis.fetch;
 
   constructor(opts: PerplexityOptions = {}) {
@@ -91,6 +94,7 @@ export class PerplexityProvider implements AnswerEngineProvider {
     this.model = opts.model ?? process.env.PERPLEXITY_MODEL ?? "sonar";
     this.maxRetries = opts.maxRetries ?? 3;
     this.baseDelayMs = opts.baseDelayMs ?? 1000;
+    this.timeoutMs = opts.timeoutMs;
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 
@@ -114,20 +118,25 @@ export class PerplexityProvider implements AnswerEngineProvider {
       { role: "user", content: prompt },
     ];
 
-    const res = await this.fetchFn(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    const res = await fetchWithTimeout(
+      this.fetchFn,
+      API_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          return_citations: true,
+          return_images: false,
+        }),
       },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        return_citations: true,
-        return_images: false,
-      }),
-    });
+      this.timeoutMs,
+    );
 
     if (!res.ok) {
       throw new PerplexityApiError(

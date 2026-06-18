@@ -1,6 +1,6 @@
 import type { AnswerEngineProvider } from "../providers";
 import type { Citation, EngineResponse } from "../types";
-import { withRetry } from "./http";
+import { fetchWithTimeout, withRetry } from "./http";
 
 export interface GeminiOptions {
   /** Google AI API key. Defaults to process.env.GEMINI_API_KEY ?? GOOGLE_API_KEY. */
@@ -17,6 +17,8 @@ export interface GeminiOptions {
   maxRetries?: number;
   /** Base delay ms for exponential backoff (1 s → 2 s → 4 s). Default: 1000. */
   baseDelayMs?: number;
+  /** Per-request timeout in ms (AbortController). Default: 60_000. Set <=0 to disable. */
+  timeoutMs?: number;
   /**
    * Injectable fetch for VCR-style testing.
    * When provided, the provider never makes a real HTTP call.
@@ -90,6 +92,7 @@ export class GeminiProvider implements AnswerEngineProvider {
   private readonly webSearch: boolean;
   private readonly maxRetries: number;
   private readonly baseDelayMs: number;
+  private readonly timeoutMs?: number;
   private readonly fetchFn: typeof globalThis.fetch;
 
   constructor(opts: GeminiOptions = {}) {
@@ -106,6 +109,7 @@ export class GeminiProvider implements AnswerEngineProvider {
     this.webSearch = opts.webSearch ?? true;
     this.maxRetries = opts.maxRetries ?? 3;
     this.baseDelayMs = opts.baseDelayMs ?? 1000;
+    this.timeoutMs = opts.timeoutMs;
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 
@@ -129,15 +133,20 @@ export class GeminiProvider implements AnswerEngineProvider {
       body["tools"] = [{ google_search: {} }];
     }
 
-    const res = await this.fetchFn(`${API_BASE}/${this.model}:generateContent`, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": this.apiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    const res = await fetchWithTimeout(
+      this.fetchFn,
+      `${API_BASE}/${this.model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": this.apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      this.timeoutMs,
+    );
 
     if (!res.ok) {
       throw new GeminiApiError(
